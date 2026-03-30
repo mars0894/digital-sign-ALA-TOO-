@@ -1,70 +1,50 @@
 spring:
   application:
     name: digital-sign
-
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:digital_sign}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:password}
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/alatoosign
+    username: ${DB_USERNAME:alatoo}
+    password: ${DB_PASSWORD:alatoo123}
     driver-class-name: org.postgresql.Driver
-
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: false
+    show-sql: true
     properties:
       hibernate:
-        format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-
   data:
     redis:
       host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-
+      port: 6379
   mail:
-    host: ${SMTP_HOST:smtp.gmail.com}
-    port: ${SMTP_PORT:587}
-    username: ${SMTP_USER:}
-    password: ${SMTP_PASSWORD:}
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
 
-  servlet:
-    multipart:
-      enabled: true
-      max-file-size: 50MB
-      max-request-size: 50MB
-
-cloud:
-  aws:
-    credentials:
-      access-key: ${S3_ACCESS_KEY:admin}
-      secret-key: ${S3_SECRET_KEY:password123}
-    s3:
-      endpoint: ${S3_ENDPOINT:http://localhost:9000}
-      region: ${S3_REGION:us-east-1}
-      bucket-name: ${S3_BUCKET_NAME:alatoo-documents}
-      presigned-url-expiry-minutes: 15
+aws:
+  s3:
+    endpoint: http://${S3_HOST:localhost}:9000
+    region: us-east-1
+    access-key: ${S3_ACCESS_KEY:admin}
+    secret-key: ${S3_SECRET_KEY:admin123}
+    bucket: digital-signatures
 
 jwt:
-  secret: ${JWT_SECRET:5c345b6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f}
-  expirationSec: ${JWT_EXPIRATION_SEC:86400}
-
-server:
-  port: 8080
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  expiration: 86400000 # 24 hours
 
 logging:
   level:
-    kg.edu.alatoo: DEBUG
-    org.springframework.security: INFO
-    org.flywaydb: INFO
+    org.springframework.security: DEBUG
+    kg.edu.alatoo.sign: DEBUG

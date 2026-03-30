@@ -1,40 +1,59 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15-alpine
+  alatoo-db:
+    image: postgres:15
     container_name: alatoo-db
     environment:
-      POSTGRES_DB: digital_sign
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: alatoosign
+      POSTGRES_USER: alatoo
+      POSTGRES_PASSWORD: alatoo123
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alatoo -d alatoosign"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  redis:
-    image: redis:7-alpine
+  alatoo-cache:
+    image: redis:7
     container_name: alatoo-cache
     ports:
       - "6379:6379"
-    restart: unless-stopped
 
-  minio:
+  alatoo-s3:
     image: minio/minio
     container_name: alatoo-s3
-    environment:
-      MINIO_ROOT_USER: ${S3_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${S3_PASSWORD:-password123}
-    command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
       - "9001:9001"
-    volumes:
-      - minio_data:/data
-    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
+    command: server /data --console-address ":9001"
+
+  alatoo-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: alatoo-backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: alatoo-db
+      REDIS_HOST: alatoo-cache
+      S3_HOST: alatoo-s3
+      JWT_SECRET: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    depends_on:
+      alatoo-db:
+        condition: service_healthy
+      alatoo-cache:
+        condition: service_started
+      alatoo-s3:
+        condition: service_started
 
 volumes:
   postgres_data:
-  minio_data:

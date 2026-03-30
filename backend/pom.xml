@@ -5,17 +5,20 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.2.4</version>
+		<version>3.3.5</version>
 		<relativePath/>
 	</parent>
+
 	<groupId>kg.edu.alatoo</groupId>
 	<artifactId>digital-sign</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>digital-sign</name>
 	<description>Ala-Too International University Digital Signature Platform</description>
+
 	<properties>
-		<java.version>17</java.version>
+		<java.version>21</java.version>
 	</properties>
+
 	<dependencies>
 		<!-- Web -->
 		<dependency>
@@ -86,18 +89,6 @@
 			<scope>runtime</scope>
 		</dependency>
 
-		<!-- AWS SDK S3 (MinIO / DigitalOcean Spaces) -->
-		<dependency>
-			<groupId>software.amazon.awssdk</groupId>
-			<artifactId>s3</artifactId>
-			<version>2.20.162</version>
-		</dependency>
-		<dependency>
-			<groupId>software.amazon.awssdk</groupId>
-			<artifactId>s3-presigner</artifactId>
-			<version>2.20.162</version>
-		</dependency>
-
 		<!-- PDF & Digital Signatures -->
 		<dependency>
 			<groupId>org.apache.pdfbox</groupId>
@@ -120,19 +111,11 @@
 			<groupId>org.flywaydb</groupId>
 			<artifactId>flyway-core</artifactId>
 		</dependency>
-		<!-- flyway-database-postgresql is only needed for Flyway 10+;
-		     Spring Boot 3.2.x manages Flyway 9.x where PostgreSQL support
-		     is bundled inside flyway-core. -->
 
 		<!-- Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.security</groupId>
-			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -142,6 +125,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.13.0</version>
 				<configuration>
 					<annotationProcessorPaths>
 						<path>
@@ -151,6 +135,7 @@
 					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
+
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
