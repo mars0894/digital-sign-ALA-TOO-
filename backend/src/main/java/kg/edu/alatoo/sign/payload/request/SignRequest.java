@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -15,15 +16,19 @@ public class SignRequest {
     @NotNull
     private UUID documentId;
 
-    @NotBlank
-    private String signatureData;
-    
-    // Optional coordinates for visual placement
-    private Integer pageNumber;
-    private Float x;
-    private Float y;
-    
-    // Optional dimensions for visual signature box
-    private Float boxWidth;
-    private Float boxHeight;
+    @NotNull
+    private List<SignatureElement> elements;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SignatureElement {
+        @NotBlank
+        private String signatureData;
+        private Integer pageNumber;
+        private Float x;
+        private Float y;
+        private Float boxWidth;
+        private Float boxHeight;
+    }
 }

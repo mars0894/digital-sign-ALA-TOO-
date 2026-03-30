@@ -25,12 +25,7 @@ public class SignatureController {
 
         signatureService.signDocument(
                 signRequest.getDocumentId(),
-                signRequest.getSignatureData(),
-                signRequest.getPageNumber(),
-                signRequest.getX(),
-                signRequest.getY(),
-                signRequest.getBoxWidth(),
-                signRequest.getBoxHeight(),
+                signRequest.getElements(),
                 currentUser
         );
 
