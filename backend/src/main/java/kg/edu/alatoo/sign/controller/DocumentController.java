@@ -91,4 +91,22 @@ public class DocumentController {
         documentService.deleteDocument(id, currentUser);
         return ResponseEntity.ok(new MessageResponse("Document deleted successfully."));
     }
+
+    /**
+     * GET /api/v1/documents/download/**
+     */
+    @GetMapping("/download/**")
+    public ResponseEntity<byte[]> downloadDocument(jakarta.servlet.http.HttpServletRequest request) {
+        String path = request.getRequestURI().split(request.getContextPath() + "/api/v1/documents/download/")[1];
+        byte[] file = documentService.getFileData(path);
+        
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        // Display inline instead of attachment to let browser render it
+        headers.setContentDispositionFormData("inline", "document.pdf");
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(file);
+    }
 }

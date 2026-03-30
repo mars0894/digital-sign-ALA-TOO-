@@ -31,6 +31,21 @@ public class Signature {
     @Column(name = "signature_data", nullable = false, columnDefinition = "TEXT")
     private String signatureData;
 
+    @Column(name = "page_number")
+    private Integer pageNumber;
+
+    @Column(name = "coordinate_x")
+    private Float coordinateX;
+
+    @Column(name = "coordinate_y")
+    private Float coordinateY;
+
+    @Column(name = "box_width")
+    private Float boxWidth;
+
+    @Column(name = "box_height")
+    private Float boxHeight;
+
     @CreationTimestamp
     @Column(name = "timestamp", updatable = false)
     private LocalDateTime timestamp;

@@ -17,4 +17,13 @@ public class SignRequest {
 
     @NotBlank
     private String signatureData;
+    
+    // Optional coordinates for visual placement
+    private Integer pageNumber;
+    private Float x;
+    private Float y;
+    
+    // Optional dimensions for visual signature box
+    private Float boxWidth;
+    private Float boxHeight;
 }

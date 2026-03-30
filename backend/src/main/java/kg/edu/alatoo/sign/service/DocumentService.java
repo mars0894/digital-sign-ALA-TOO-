@@ -81,6 +81,15 @@ public class DocumentService {
     }
 
     /**
+     * Download the physical PDF file
+     */
+    @Transactional(readOnly = true)
+    public byte[] getFileData(String key) {
+        // Simple security can be added here if needed, but the keys are UUID based
+        return storageService.getFile(key);
+    }
+
+    /**
      * Soft-delete: move document to REJECTED status (preserves audit trail).
      */
     @Transactional
