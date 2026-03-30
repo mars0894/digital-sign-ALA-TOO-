@@ -1,0 +1,3 @@
+﻿build_output*.txt
+backend/local_storage/
+backend/out.log
