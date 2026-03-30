@@ -7,6 +7,7 @@ import kg.edu.alatoo.sign.entity.User;
 import kg.edu.alatoo.sign.payload.response.DocumentResponse;
 import kg.edu.alatoo.sign.repository.AuditLogRepository;
 import kg.edu.alatoo.sign.repository.DocumentRepository;
+import kg.edu.alatoo.sign.repository.SignatureRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class DocumentService {
 
     private final DocumentRepository documentRepository;
     private final AuditLogRepository auditLogRepository;
+    private final SignatureRepository signatureRepository;
     private final StorageService storageService;
 
     /**
@@ -142,6 +144,11 @@ public class DocumentService {
                 .downloadUrl(presignedUrl)
                 .ownerEmail(doc.getOwner().getEmail())
                 .ownerName(doc.getOwner().getFirstName() + " " + doc.getOwner().getLastName())
+                .signedAt(doc.getStatus() == DocumentStatus.SIGNED 
+                    ? signatureRepository.findByDocumentId(doc.getId()).stream()
+                        .map(kg.edu.alatoo.sign.entity.Signature::getTimestamp)
+                        .findFirst().orElse(null) 
+                    : null)
                 .build();
     }
 }

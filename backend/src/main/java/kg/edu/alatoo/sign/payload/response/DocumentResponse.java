@@ -22,4 +22,5 @@ public class DocumentResponse {
     private String downloadUrl; // presigned URL, may be null in list responses
     private String ownerEmail;
     private String ownerName;
+    private LocalDateTime signedAt;
 }
