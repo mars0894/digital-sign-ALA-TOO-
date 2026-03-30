@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { saveAuth } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,14 +32,13 @@ export default function LoginPage() {
         throw new Error(data.message || 'Login failed');
       }
 
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify({
+      saveAuth(data.token, {
         id: data.id,
         email: data.email,
         firstName: data.firstName,
         lastName: data.lastName,
-        roles: data.roles
-      }));
+        roles: data.roles,
+      });
 
       router.push('/dashboard');
     } catch (err: any) {
