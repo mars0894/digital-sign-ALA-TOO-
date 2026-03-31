@@ -21,6 +21,7 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
     private final JwtAuthFilter jwtAuthFilter;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
@@ -50,6 +51,9 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/v1/documents/download/**").permitAll()
                 .anyRequest().authenticated()
+            )
+            .oauth2Login(oauth2 -> oauth2
+                .successHandler(oAuth2LoginSuccessHandler)
             );
 
         http.authenticationProvider(authenticationProvider());

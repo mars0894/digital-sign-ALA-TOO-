@@ -29,18 +29,31 @@ public class DocumentService {
     private final AuditLogRepository auditLogRepository;
     private final SignatureRepository signatureRepository;
     private final StorageService storageService;
+    private final DocumentConversionService documentConversionService;
 
     /**
      * Upload a PDF and persist the Document record.
      */
     @Transactional
     public DocumentResponse uploadDocument(MultipartFile file, String title, User owner) throws IOException {
-        if (!isPdf(file)) {
-            throw new IllegalArgumentException("Only PDF files are accepted.");
+        byte[] pdfData;
+        try {
+            pdfData = documentConversionService.convertToPdf(file);
+        } catch (Exception e) {
+            log.error("Failed to convert document", e);
+            throw new IllegalArgumentException("Failed to process file format: " + e.getMessage());
         }
 
-        String key = buildStorageKey(owner.getId(), file.getOriginalFilename());
-        storageService.uploadFile(key, file.getBytes(), "application/pdf");
+        String originalName = file.getOriginalFilename();
+        String safeFileName = (originalName != null && !originalName.trim().isEmpty()) ? originalName : "document";
+        if (safeFileName.contains(".")) {
+            safeFileName = safeFileName.substring(0, safeFileName.lastIndexOf('.')) + ".pdf";
+        } else {
+            safeFileName += ".pdf";
+        }
+
+        String key = buildStorageKey(owner.getId(), safeFileName);
+        storageService.uploadFile(key, pdfData, "application/pdf");
 
         Document document = Document.builder()
                 .owner(owner)
@@ -55,6 +68,19 @@ public class DocumentService {
                 "Uploaded PDF: " + file.getOriginalFilename() + " (" + file.getSize() + " bytes)");
 
         return toResponse(document, null);
+    }
+
+    /**
+     * Converts a file to PDF without saving it to storage or creating a Document record.
+     */
+    @Transactional(readOnly = true)
+    public byte[] convertToPdfOnly(MultipartFile file) throws IOException {
+        try {
+            return documentConversionService.convertToPdf(file);
+        } catch (Exception e) {
+            log.error("Failed to convert document", e);
+            throw new IllegalArgumentException("Failed to process file format: " + e.getMessage());
+        }
     }
 
     /**
@@ -118,13 +144,6 @@ public class DocumentService {
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private boolean isPdf(MultipartFile file) {
-        String contentType = file.getContentType();
-        String name = file.getOriginalFilename();
-        return "application/pdf".equalsIgnoreCase(contentType)
-                || (name != null && name.toLowerCase().endsWith(".pdf"));
-    }
 
     private String buildStorageKey(UUID userId, String originalFilename) {
         String sanitized = originalFilename != null

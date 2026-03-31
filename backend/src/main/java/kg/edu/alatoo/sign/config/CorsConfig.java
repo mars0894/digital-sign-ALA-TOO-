@@ -14,7 +14,7 @@ public class CorsConfig {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("http://localhost:3000", "https://*.alatoo.edu.kg"));
+        config.setAllowedOriginPatterns(List.of("http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "https://*.alatoo.edu.kg"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));

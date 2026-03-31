@@ -16,8 +16,9 @@ export default function UploadPage() {
   const [success, setSuccess] = useState(false);
 
   const handleFile = (f: File) => {
-    if (!f.type.includes('pdf') && !f.name.toLowerCase().endsWith('.pdf')) {
-      setError('Only PDF files are accepted.');
+    const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.png', '.jpg', '.jpeg'];
+    if (!allowedExtensions.some(ext => f.name.toLowerCase().endsWith(ext))) {
+      setError('Unsupported file type. Please upload PDF, Office documents, or Images.');
       setFile(null);
       return;
     }
@@ -28,7 +29,10 @@ export default function UploadPage() {
     }
     setError('');
     setFile(f);
-    if (!title) setTitle(f.name.replace(/\.pdf$/i, ''));
+    if (!title) {
+      const extMatch = f.name.lastIndexOf('.');
+      setTitle(extMatch > 0 ? f.name.substring(0, extMatch) : f.name);
+    }
   };
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -43,7 +47,7 @@ export default function UploadPage() {
 
   const handleUpload = async () => {
     if (!file || !title.trim()) {
-      setError('Please provide a title and select a PDF file.');
+      setError('Please provide a title and select a file.');
       return;
     }
 
@@ -97,7 +101,7 @@ export default function UploadPage() {
       <div style={{ marginBottom: '2.5rem' }}>
         <h1 style={{ fontSize: '1.75rem', fontWeight: '700', marginBottom: '0.25rem' }}>Upload Document</h1>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', margin: 0 }}>
-          Upload a PDF document for digital signing. Maximum file size: 50 MB.
+          Upload a PDF, Word, Excel, or Image for digital signing. We convert it to PDF automatically. Max size: 50 MB.
         </p>
       </div>
 
@@ -123,7 +127,7 @@ export default function UploadPage() {
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,application/pdf"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg"
           style={{ display: 'none' }}
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
@@ -152,10 +156,10 @@ export default function UploadPage() {
               </svg>
             </div>
             <p style={{ fontWeight: '600', margin: '0 0 0.375rem', fontSize: '1rem' }}>
-              {dragging ? 'Drop your PDF here' : 'Drag & drop or click to browse'}
+              {dragging ? 'Drop your file here' : 'Drag & drop or click to browse'}
             </p>
             <p style={{ color: 'var(--color-text-muted)', margin: 0, fontSize: '0.8rem' }}>
-              PDF files only · Up to 50 MB
+              PDF, Word, Excel, PowerPoint, PNG, JPG · Up to 50 MB
             </p>
           </div>
         )}
@@ -205,7 +209,7 @@ export default function UploadPage() {
       {uploading && (
         <div style={{ marginBottom: '1.25rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '0.4rem' }}>
-            <span>Uploading...</span>
+            <span>{file && !file.name.toLowerCase().endsWith('.pdf') ? 'Uploading & Converting to PDF...' : 'Uploading...'}</span>
             <span>{progress}%</span>
           </div>
           <div style={{ height: '6px', background: 'var(--color-border)', borderRadius: '999px', overflow: 'hidden' }}>

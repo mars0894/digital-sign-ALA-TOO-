@@ -23,12 +23,16 @@ interface SignModalProps {
 
 interface PlacedElement {
   id: string;
-  signatureData: string;
+  signatureData: string; // Base64 image OR plain string if type=TEXT
   pageNumber: number;
   x: number;
   y: number;
   width: number;
   height: number;
+  type?: string;
+  color?: string;
+  fontSize?: number;
+  fontName?: string;
 }
 
 export default function SignModal({ isOpen, onClose, documentId, documentTitle, onSuccess }: SignModalProps) {
@@ -47,12 +51,12 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
   // Tabs
-  type TabType = 'draw' | 'vault' | 'extract' | 'text';
+  type TabType = 'draw' | 'upload' | 'text' | 'tools' | 'vault' | 'extract';
   const [activeTab, setActiveTab] = useState<TabType>('draw');
 
   // Text State
   const [textInput, setTextInput] = useState('');
-  const [textStyle, setTextStyle] = useState({ font: 'Brush Script MT, cursive', size: 64, color: '#000000' });
+  const [textStyle, setTextStyle] = useState({ css: 'Brush Script MT, cursive', pdf: 'HELVETICA_OBLIQUE', size: 64, color: '#000000' });
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Vault State
@@ -99,14 +103,14 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
          return;
       }
       
-      ctx.font = `${textStyle.size}px ${textStyle.font}`;
+      ctx.font = `${textStyle.size}px ${textStyle.css}`;
       const metrics = ctx.measureText(textInput);
       const width = Math.max(10, metrics.width + 20);
       const height = Math.max(10, textStyle.size * 1.5);
       
       canvas.width = width;
       canvas.height = height;
-      ctx.font = `${textStyle.size}px ${textStyle.font}`;
+      ctx.font = `${textStyle.size}px ${textStyle.css}`;
       ctx.fillStyle = textStyle.color;
       ctx.textBaseline = 'middle';
       ctx.fillText(textInput, 10, height / 2);
@@ -158,7 +162,11 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
         x: el.x,
         y: el.y,
         boxWidth: el.width,
-        boxHeight: el.height
+        boxHeight: el.height,
+        type: el.type || 'IMAGE',
+        color: el.color,
+        fontSize: el.fontSize,
+        fontName: el.fontName
       }));
 
       const res = await authFetch('/signatures', {
@@ -183,7 +191,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
     }
   }
 
-  function addUniqueElement(data: string, width: number, height: number, vaultSaveReq?: {label: string, data: string}) {
+  function addUniqueElement(data: string, width: number, height: number, vaultSaveReq?: {label: string, data: string}, overrides?: Partial<PlacedElement>) {
     const ratio = width / height;
     const targetW = width > 300 ? 300 : Math.max(width, 100);
     const targetH = targetW / ratio;
@@ -195,7 +203,8 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
       x: 50 + ((prev.length * 20) % 200),
       y: 100 + ((prev.length * 20) % 200),
       width: targetW,
-      height: targetH
+      height: targetH,
+      ...overrides
     }]);
 
     // Handle vault auto-saving silently
@@ -226,11 +235,49 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
   function handleInsertText() {
     if (!textInput.trim() || !textCanvasRef.current) return;
     const canvas = textCanvasRef.current;
-    const data = canvas.toDataURL('image/png');
-    addUniqueElement(data, canvas.width, canvas.height, (saveToVault && vaultLabel.trim()) ? {label: vaultLabel.trim(), data} : undefined);
+    
+    // Pass the actual string for vector rendering alongside preview data constraints
+    addUniqueElement(
+      textInput, 
+      canvas.width, 
+      canvas.height, 
+      undefined,
+      { type: 'TEXT', color: textStyle.color, fontSize: textStyle.size, fontName: textStyle.pdf }
+    );
+    
     setTextInput('');
     setSaveToVault(false);
     setVaultLabel('');
+  }
+
+  function handleUploadImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        addUniqueElement(dataUrl, img.width, img.height, undefined, { type: 'IMAGE' });
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleAutoDate() {
+    const d = new Date();
+    const dateStr = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+    addUniqueElement(dateStr, 150, 40, undefined, { type: 'TEXT', color: '#000000', fontSize: 18, fontName: 'HELVETICA' });
+  }
+
+  function handleInsertIcon(iconType: 'check' | 'cross') {
+    // Basic SVGs passed as data URI rendering images. Backend seamlessly scales them!
+    const checkSvg = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>');
+    const crossSvg = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="red" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>');
+    
+    const svgData = iconType === 'check' ? checkSvg : crossSvg;
+    addUniqueElement(svgData, 40, 40, undefined, { type: 'IMAGE' });
   }
 
   function handleExtractCrop() {
@@ -411,29 +458,13 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
         {error && <div style={{ padding: '0.75rem', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', marginBottom: '1rem', border: '1px solid rgba(239,68,68,0.2)', fontSize: '0.875rem' }}>{error}</div>}
 
         {/* Split UI */}
-        <div style={{ display: 'flex', gap: '2rem', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', flex: 1, overflow: 'hidden', flexDirection: 'row-reverse' }}>
           
           {/* LEFT PANELS: Live Output Target */}
           <div style={{ flex: '1 1 50%', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden', userSelect: 'none' }}>
             <div style={{ padding: '0.5rem', display: 'flex', justifyContent: 'center', gap: '1rem', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid var(--color-border)', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', marginRight: 'auto', marginLeft: '1rem', gap: '1rem' }}>
-                <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>Target Document Preview</span>
-                {selectedElementId && (() => {
-                  const el = placedElements.find(p => p.id === selectedElementId);
-                  return el ? (
-                    <div style={{ display: 'flex', gap: '8px', background: 'rgba(59, 130, 246, 0.15)', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.4)' }}>
-                      <button title="Duplicate Selected" onClick={() => handleDuplicateElement(el)} style={{ background: 'transparent', border: 'none', color: '#60a5fa', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Duplicate
-                      </button>
-                      <button title="Save to Vault" onClick={() => handleSaveToVaultQuick(el)} style={{ background: 'transparent', border: 'none', color: '#10b981', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg> Save Vault
-                      </button>
-                      <button title="Delete Selected" onClick={() => { setPlacedElements(prev => prev.filter(p => p.id !== el.id)); setSelectedElementId(null); }} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase' }}>
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> Delete
-                      </button>
-                    </div>
-                  ) : null;
-                })()}
+                <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>Target Document</span>
               </div>
               <button disabled={pageNumber <= 1} onClick={() => setPageNumber(v => v - 1)} style={{ padding: '0.2rem 0.5rem', cursor: 'pointer', background: 'var(--glass-bg)', color: 'var(--color-text-main)', border: '1px solid var(--color-border)', borderRadius: '4px' }}>Prev</button>
               <span style={{ color: 'var(--color-text-main)', fontSize: '0.9rem', display: 'flex', alignItems: 'center' }}>Page {pageNumber} of {numPages}</span>
@@ -451,11 +482,23 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                       return (
                       <div onMouseDown={(e) => docHandlers.onBoxMouseDown(e, el)} key={el.id} style={{ position: 'absolute', left: el.x, top: el.y, width: el.width, height: el.height, border: isSelected ? '2px dashed #3b82f6' : '1px dashed transparent', outline: isSelected ? 'none' : '2px dashed rgba(16, 185, 129, 0.4)', cursor: dragState?.id === el.id && dragState.mode === 'drag' ? 'grabbing' : 'grab', display: 'flex' }}>
                          
-                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                         <img src={el.signatureData} alt="Element" style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: isSelected ? 1 : 0.95 }} draggable={false}/>
+                         {el.type === 'TEXT' ? (
+                           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', color: el.color, fontSize: `${(el.width / Math.max(10, el.signatureData.length))}px`, whiteSpace: 'nowrap', opacity: isSelected ? 1 : 0.95, fontFamily: el.fontName === 'COURIER' ? 'monospace' : el.fontName === 'TIMES_ROMAN' ? 'serif' : 'Arial, sans-serif', fontStyle: el.fontName === 'HELVETICA_OBLIQUE' || el.fontName === 'TIMES_ITALIC' ? 'italic' : 'normal', fontWeight: el.fontName?.includes('BOLD') ? 'bold' : 'normal' }}>{el.signatureData}</div>
+                         ) : (
+                           // eslint-disable-next-line @next/next/no-img-element
+                           <img src={el.signatureData} alt="Element" style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: isSelected ? 1 : 0.95 }} draggable={false}/>
+                         )}
                          
                          {isSelected && (
-                           <div onMouseDown={(e) => docHandlers.onResizeMouseDown(e, el)} style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '16px', height: '16px', background: '#3b82f6', borderRadius: '50%', cursor: 'nwse-resize', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+                           <>
+                             <div onMouseDown={(e) => docHandlers.onResizeMouseDown(e, el)} style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '16px', height: '16px', background: '#3b82f6', borderRadius: '50%', cursor: 'nwse-resize', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
+                             <div style={{ position: 'absolute', top: '-40px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', background: 'rgba(20, 25, 35, 0.95)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', zIndex: 10 }}>
+                               <button title="Duplicate" onMouseDown={(e) => { e.stopPropagation(); handleDuplicateElement(el); }} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: '2px', display: 'flex' }}><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
+                               <button title="Save Vault" onMouseDown={(e) => { e.stopPropagation(); handleSaveToVaultQuick(el); }} style={{ background: 'none', border: 'none', color: '#6ee7b7', cursor: 'pointer', padding: '2px', display: 'flex' }}><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg></button>
+                               <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+                               <button title="Delete" onMouseDown={(e) => { e.stopPropagation(); setPlacedElements(prev => prev.filter(p => p.id !== el.id)); setSelectedElementId(null); }} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', padding: '2px', display: 'flex' }}><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                             </div>
+                           </>
                          )}
                       </div>
                     )})}
@@ -465,18 +508,20 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
             </div>
           </div>
 
-          {/* RIGHT PANELS: Input Method */}
-          <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+          {/* RIGHT PANELS: Input Method (Now Left Sidebar via row-reverse) */}
+          <div style={{ width: '380px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'rgba(20, 25, 35, 0.4)', borderRadius: '12px', border: '1px solid var(--color-border)', backdropFilter: 'blur(10px)' }}>
             
             {/* Tab Header */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)' }}>
-              {['draw', 'text', 'vault', 'extract'].map((tab) => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--color-border)', gap: '1px', background: 'var(--color-border)' }}>
+              {['draw', 'upload', 'text', 'tools', 'vault', 'extract'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as TabType)}
-                  style={{ flex: 1, padding: '1rem', background: activeTab === tab ? 'rgba(16, 185, 129, 0.1)' : 'transparent', border: 'none', color: activeTab === tab ? '#10b981' : 'var(--color-text-main)', borderBottom: activeTab === tab ? '2px solid #10b981' : '2px solid transparent', cursor: 'pointer', fontWeight: 600, textTransform: 'capitalize' }}
+                  style={{ padding: '0.8rem 0.5rem', background: activeTab === tab ? 'rgba(16, 185, 129, 0.1)' : 'rgba(20, 25, 35, 1)', border: 'none', color: activeTab === tab ? '#10b981' : 'var(--color-text-main)', cursor: 'pointer', fontWeight: 600, textTransform: 'capitalize', fontSize: '0.80rem', borderBottom: activeTab === tab ? '2px solid #10b981' : '2px solid transparent', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { if (activeTab !== tab) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+                  onMouseLeave={e => { if (activeTab !== tab) e.currentTarget.style.background = 'rgba(20, 25, 35, 1)' }}
                 >
-                  {tab === 'vault' ? 'Saved Vault' : tab === 'extract' ? 'PDF Extractor' : tab === 'text' ? 'Type Text' : 'Draw New'}
+                  {tab === 'vault' ? 'Vault' : tab === 'extract' ? 'PDF Extractor' : tab === 'tools' ? 'Quick Tools' : tab}
                 </button>
               ))}
             </div>
@@ -503,6 +548,18 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                     )}
                   </div>
                   <button onClick={handleInsertDrawing} style={{ width: '100%', padding: '0.8rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '1.05rem' }}>Insert Drawing into Document</button>
+                </div>
+              )}
+
+              {/* TAB 1.5: UPLOAD */}
+              {activeTab === 'upload' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: '0.95rem', margin: 0, textAlign: 'center' }}>Upload a picture of your seal, signature, or stamp directly.</p>
+                  <label style={{ border: '2px dashed var(--color-accent)', borderRadius: '12px', padding: '3rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', color: 'var(--color-accent)', background: 'rgba(59, 130, 246, 0.05)', width: '100%', transition: 'all 0.2s' }}>
+                    <input type="file" accept="image/png, image/jpeg" onChange={handleUploadImage} style={{ display: 'none' }} />
+                    <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    <span style={{ marginTop: '1rem', fontWeight: 600 }}>Click to Browse Local Image</span>
+                  </label>
                 </div>
               )}
 
@@ -602,16 +659,22 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                   
                   <div style={{ display: 'flex', gap: '1rem' }}>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      <label style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Font</label>
+                      <label style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Font Vector</label>
                       <select 
-                        value={textStyle.font} 
-                        onChange={e => setTextStyle(prev => ({ ...prev, font: e.target.value }))}
-                        style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--glass-bg)', color: 'var(--color-text-main)', outline: 'none' }}
+                        value={textStyle.pdf} 
+                        onChange={e => {
+                           const pdf = e.target.value;
+                           const css = e.target.options[e.target.selectedIndex].getAttribute('data-css') || 'sans-serif';
+                           setTextStyle(prev => ({ ...prev, pdf, css }));
+                        }}
+                        style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--glass-bg)', color: 'var(--color-text-main)', outline: 'none', fontFamily: textStyle.css }}
                       >
-                        <option value="Brush Script MT, cursive">Brush Script (Cursive)</option>
-                        <option value="Arial, sans-serif">Arial (Sans-Serif)</option>
-                        <option value="Georgia, serif">Georgia (Serif)</option>
-                        <option value="Courier New, monospace">Courier New (Monospace)</option>
+                        <option value="HELVETICA" data-css="Helvetica, Arial, sans-serif" style={{ fontFamily: 'Helvetica, Arial, sans-serif' }}>Helvetica (Clean Standard)</option>
+                        <option value="HELVETICA_BOLD" data-css="Helvetica, Arial, sans-serif" style={{ fontFamily: 'Helvetica, Arial, sans-serif', fontWeight: 'bold' }}>Helvetica Bold (Headline)</option>
+                        <option value="HELVETICA_OBLIQUE" data-css="cursive" style={{ fontFamily: 'cursive', fontStyle: 'italic' }}>Cursive (Signature Emulation)</option>
+                        <option value="TIMES_ROMAN" data-css="Times New Roman, serif" style={{ fontFamily: 'Times New Roman, serif' }}>Times Roman (Formal Document)</option>
+                        <option value="TIMES_BOLD" data-css="Times New Roman, serif" style={{ fontFamily: 'Times New Roman, serif', fontWeight: 'bold' }}>Times Bold (Formal Heavy)</option>
+                        <option value="COURIER" data-css="Courier, monospace" style={{ fontFamily: 'Courier, monospace' }}>Courier (Typewriter / Mono)</option>
                       </select>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
@@ -643,16 +706,51 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                 </div>
               )}
 
+              {/* TAB 5: QUICK TOOLS */}
+              {activeTab === 'tools' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+                  <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', margin: 0 }}>Instantly drop common properties directly onto the document.</p>
+                  
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    
+                    <div>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-text-main)', fontSize: '0.95rem' }}>Date Stamp</h4>
+                      <button onClick={handleAutoDate} style={{ width: '100%', padding: '0.8rem', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '8px', color: '#60a5fa', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                        <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        Insert Today's Date
+                      </button>
+                    </div>
+
+                    <div style={{ height: '1px', background: 'var(--color-border)', margin: '0.5rem 0' }} />
+
+                    <div>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-text-main)', fontSize: '0.95rem' }}>Checkmarks & Forms</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <button onClick={() => handleInsertIcon('check')} style={{ padding: '0.8rem', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '8px', color: '#10b981', fontWeight: 600, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                          Checkmark
+                        </button>
+                        <button onClick={() => handleInsertIcon('cross')} style={{ padding: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', color: '#ef4444', fontWeight: 600, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                          Cross X
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+
             </div>
 
             {/* Action Footer */}
-            <div style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <span style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginRight: 'auto' }}>
-                {placedElements.length} element(s) to stamp
-              </span>
-              <button disabled={signing} onClick={onClose} style={{ flex: 1, padding: '0.85rem', borderRadius: '10px', background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-main)', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-              <button disabled={signing || placedElements.length === 0} onClick={handleSign} style={{ flex: 2, padding: '0.85rem', borderRadius: '10px', background: (placedElements.length === 0 || signing) ? 'var(--color-border)' : 'linear-gradient(135deg, #10b981, #059669)', border: 'none', color: 'white', cursor: (placedElements.length === 0 || signing) ? 'not-allowed' : 'pointer', fontWeight: 600, boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)' }}>
-                {signing ? 'Finalizing Document...' : 'Stamp & Complete Document'}
+            <div style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button disabled={signing || placedElements.length === 0} onClick={handleSign} style={{ width: '100%', padding: '1rem', borderRadius: '10px', background: (placedElements.length === 0 || signing) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #10b981, #059669)', border: (placedElements.length === 0 || signing) ? '1px solid var(--color-border)' : 'none', color: (placedElements.length === 0 || signing) ? 'var(--color-text-muted)' : 'white', cursor: (placedElements.length === 0 || signing) ? 'not-allowed' : 'pointer', fontWeight: 600, boxShadow: (placedElements.length === 0 || signing) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.25)', transition: 'all 0.2s', fontSize: '1rem' }}>
+                {signing ? 'Working...' : `Stamp ${placedElements.length} Elements`}
+              </button>
+              <button disabled={signing} onClick={onClose} style={{ width: '100%', padding: '0.8rem', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = 'white'} onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-muted)'}>
+                Discard Changes
               </button>
             </div>
           </div>

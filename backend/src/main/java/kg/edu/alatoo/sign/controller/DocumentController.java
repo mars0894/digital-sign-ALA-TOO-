@@ -45,6 +45,30 @@ public class DocumentController {
     }
 
     /**
+     * POST /api/v1/documents/convert-only
+     * Convert any file to PDF without saving it to storage. Used for tools like Extractor.
+     */
+    @PostMapping(value = "/convert-only", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<byte[]> convertOnly(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal User currentUser) throws IOException {
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        byte[] pdfData = documentService.convertToPdfOnly(file);
+        
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("inline", "converted.pdf");
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(pdfData);
+    }
+
+    /**
      * GET /api/v1/documents
      * List all documents owned by the authenticated user.
      */

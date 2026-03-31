@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: digital-sign
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:mock-google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:mock-google-client-secret}
+            scope: profile, email
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:5432/alatoosign
     username: ${DB_USERNAME:alatoo}
@@ -49,3 +57,6 @@ logging:
   level:
     org.springframework.security: DEBUG
     kg.edu.alatoo.sign: DEBUG
+
+gotenberg:
+  url: ${GOTENBERG_URL:http://localhost:8082}

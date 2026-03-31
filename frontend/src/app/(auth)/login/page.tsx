@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { saveAuth } from '@/lib/auth';
+import { API_URL } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:8080/api/v1/auth/login', {
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,12 +116,24 @@ export default function LoginPage() {
           <button style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-text-main)', width: '100%', padding: '0.75rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.875rem', fontWeight: '500' }}
             onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
             onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+            onClick={() => window.location.href = 'http://localhost:8081/oauth2/authorization/google'}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 2C6.477 2 2 6.477 2 12c0 5.523 4.477 10 10 10 5.523 0 10-4.477 10-10C22 6.477 17.523 2 12 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M12 7.5v9M7.5 12h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Continue with Ala-Too SSO
+            Continue with Google SSO
+          </button>
+          
+          <button style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-text-main)', width: '100%', padding: '0.75rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.875rem', fontWeight: '500', marginTop: '1rem' }}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+            onClick={() => window.location.href = 'http://localhost:8081/oauth2/authorization/microsoft'}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 0h7v7h-7v-7z" fill="currentColor"/>
+            </svg>
+            Continue with Microsoft SSO
           </button>
         </div>
       </div>

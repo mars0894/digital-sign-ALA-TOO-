@@ -35,6 +35,12 @@ services:
       MINIO_ROOT_PASSWORD: admin123
     command: server /data --console-address ":9001"
 
+  alatoo-gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: alatoo-gotenberg
+    ports:
+      - "8082:3000"
+
   alatoo-backend:
     build:
       context: ./backend
@@ -46,6 +52,7 @@ services:
       DB_HOST: alatoo-db
       REDIS_HOST: alatoo-cache
       S3_HOST: alatoo-s3
+      GOTENBERG_URL: http://alatoo-gotenberg:3000
       JWT_SECRET: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
     depends_on:
       alatoo-db:
@@ -53,6 +60,8 @@ services:
       alatoo-cache:
         condition: service_started
       alatoo-s3:
+        condition: service_started
+      alatoo-gotenberg:
         condition: service_started
 
 volumes:

@@ -48,7 +48,7 @@ public class StorageService {
     }
 
     public String generatePresignedUrl(String key) {
-        return "http://localhost:8080/api/v1/documents/download/" + key;
+        return "http://localhost:8081/api/v1/documents/download/" + key;
     }
 
     public void deleteFile(String key) {

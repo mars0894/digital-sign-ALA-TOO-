@@ -5,97 +5,223 @@ import Link from 'next/link';
 export default function Home() {
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      padding: '2rem', position: 'relative', overflow: 'hidden',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem',
+      position: 'relative',
+      overflow: 'hidden',
+      backgroundColor: 'var(--color-background)',
     }}>
-      {/* Animated background blobs */}
-      <div style={{
-        position: 'absolute', top: '-20%', left: '50%',
-        transform: 'translateX(-50%)', width: '60vw', height: '60vw',
-        background: 'radial-gradient(circle, rgba(59,130,246,0.18) 0%, rgba(0,0,0,0) 70%)',
-        borderRadius: '50%', zIndex: 0,
-        animation: 'pulse 8s ease-in-out infinite',
-      }} />
-      <div style={{
-        position: 'absolute', bottom: '-10%', right: '10%',
-        width: '35vw', height: '35vw',
-        background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, rgba(0,0,0,0) 70%)',
-        borderRadius: '50%', zIndex: 0,
-        animation: 'pulse 10s ease-in-out infinite 2s',
-      }} />
+      {/* Dynamic Background */}
+      <div className="bg-glow blob-1" />
+      <div className="bg-glow blob-2" />
+      <div className="bg-glow blob-3" />
 
-      {/* Hero card */}
+      {/* Main Glass Container */}
       <div className="glass-panel" style={{
-        textAlign: 'center', padding: '4rem 3rem',
-        maxWidth: '820px', width: '100%', position: 'relative', zIndex: 1,
+        textAlign: 'center',
+        padding: '5rem 4rem',
+        maxWidth: '900px',
+        width: '100%',
+        position: 'relative',
+        zIndex: 10,
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }}>
-        {/* Badge */}
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0.4rem 1rem', borderRadius: '999px',
-          border: '1px solid rgba(59,130,246,0.3)',
-          background: 'rgba(59,130,246,0.08)',
-          fontSize: '0.78rem', fontWeight: '600', color: 'var(--color-accent)',
-          marginBottom: '1.75rem', letterSpacing: '0.04em',
-        }}>
-          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--color-accent)', animation: 'blink 1.5s ease-in-out infinite' }} />
-          Ala-Too International University
+        {/* Status Badge */}
+        <div className="status-badge hover-lift">
+          <span className="dot pulse" />
+          Ala-Too International University System Active
         </div>
 
-        <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.75rem)', lineHeight: '1.15', marginBottom: '1.25rem' }}>
-          Secure &amp; Official <br />
-          <span className="text-gradient">Digital Signatures</span>
+        <h1 style={{
+          fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
+          lineHeight: '1.1',
+          marginBottom: '1.5rem',
+          fontWeight: '800',
+        }}>
+          Next-Generation <br />
+          <span className="text-gradient hover-glow">Digital Signatures</span>
         </h1>
 
         <p style={{
-          color: 'var(--color-text-muted)', fontSize: '1.15rem',
-          marginBottom: '3rem', maxWidth: '560px', margin: '0 auto 3rem',
+          color: 'var(--color-text-muted)',
+          fontSize: '1.25rem',
+          marginBottom: '3.5rem',
+          maxWidth: '600px',
+          margin: '0 auto 3.5rem',
           lineHeight: '1.7',
+          fontWeight: '400',
         }}>
-          Legally binding documents and internal academic processes — signed,
-          verified, and audited on one secure platform.
+          Legally binding documents, automated workflows, and internal academic
+          processes — signed, verified, and audited instantly.
         </p>
 
-        {/* CTA buttons */}
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '4rem' }}>
-          <Link href="/login" className="btn-primary" style={{ minWidth: '160px', textDecoration: 'none', borderRadius: '12px', padding: '0.875rem 2rem', fontSize: '0.95rem' }}>
-            Sign In
+        {/* Action Buttons */}
+        <div style={{
+          display: 'flex',
+          gap: '1.5rem',
+          justifyContent: 'center',
+          flexWrap: 'wrap',
+          marginBottom: '5rem'
+        }}>
+          <Link href="/dashboard" className="btn-primary hover-lift" style={{
+            padding: '1rem 2.5rem',
+            fontSize: '1rem',
+            borderRadius: '16px'
+          }}>
+            Open Dashboard
           </Link>
-          <Link href="/register" className="btn-secondary" style={{ minWidth: '160px', textDecoration: 'none', borderRadius: '12px', padding: '0.875rem 2rem', fontSize: '0.95rem' }}>
-            Create Account
+          <Link href="/documents" className="btn-secondary hover-lift" style={{
+            padding: '1rem 2.5rem',
+            fontSize: '1rem',
+            borderRadius: '16px',
+            background: 'rgba(255,255,255,0.05)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            Verify Document
           </Link>
         </div>
 
-        {/* Divider */}
-        <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '2.5rem' }} />
-
-        {/* Stats row */}
-        <div style={{ display: 'flex', gap: '3rem', justifyContent: 'center', flexWrap: 'wrap', color: 'var(--color-text-muted)' }}>
+        {/* Footer Stats Structure */}
+        <div style={{
+          borderTop: '1px solid var(--glass-border)',
+          paddingTop: '3rem',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: '2rem',
+        }}>
           {[
-            { value: '100%', label: 'PAdES Compliant' },
-            { value: 'SSO', label: 'Seamless Integration' },
-            { value: 'Immutable', label: 'Audit Trails' },
-            { value: '50MB', label: 'Max Document Size' },
-          ].map((s) => (
-            <div key={s.label} style={{ textAlign: 'center' }}>
-              <span style={{ display: 'block', fontSize: '1.6rem', fontWeight: '700', color: 'var(--color-text-main)', fontFamily: 'var(--font-display)' }}>
-                {s.value}
+            { value: 'PAdES', label: '100% Compliant' },
+            { value: 'SSO', label: 'Seamless Access' },
+            { value: 'Audit', label: 'Immutable Logs' },
+            { value: 'Instant', label: 'Verification' },
+          ].map((stat, idx) => (
+            <div key={idx} className="stat-card hover-lift">
+              <span style={{
+                display: 'block',
+                fontSize: '1.8rem',
+                fontWeight: '800',
+                color: 'var(--color-text-main)',
+                fontFamily: 'var(--font-display)',
+                marginBottom: '0.25rem'
+              }}>
+                {stat.value}
               </span>
-              <span style={{ fontSize: '0.82rem' }}>{s.label}</span>
+              <span style={{
+                fontSize: '0.85rem',
+                color: 'var(--color-text-muted)',
+                fontWeight: '500',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                {stat.label}
+              </span>
             </div>
           ))}
         </div>
       </div>
 
       <style jsx global>{`
-        @keyframes pulse {
-          0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
-          50% { transform: translateX(-50%) scale(1.08); opacity: 0.8; }
+        .bg-glow {
+          position: absolute;
+          filter: blur(100px);
+          opacity: 0.6;
+          z-index: 0;
+          border-radius: 50%;
         }
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
+        .blob-1 {
+          top: -20%;
+          left: -10%;
+          width: 50vw;
+          height: 50vw;
+          background: var(--color-accent);
+          animation: float 15s ease-in-out infinite alternate;
+        }
+        .blob-2 {
+          bottom: -10%;
+          right: -10%;
+          width: 40vw;
+          height: 40vw;
+          background: #8b5cf6;
+          animation: float 20s ease-in-out infinite alternate-reverse;
+        }
+        .blob-3 {
+          top: 30%;
+          left: 50%;
+          width: 30vw;
+          height: 30vw;
+          background: #10b981;
+          opacity: 0.3;
+          animation: float 12s ease-in-out infinite alternate;
+        }
+
+        .status-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.5rem 1.25rem;
+          border-radius: 999px;
+          border: 1px solid var(--glass-border);
+          background: rgba(255, 255, 255, 0.05);
+          backdrop-filter: blur(10px);
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: var(--color-text-main);
+          margin-bottom: 2rem;
+          letter-spacing: 0.05em;
+        }
+
+        .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--color-accent);
+        }
+
+        .pulse {
+          animation: pulse 2s infinite;
+        }
+
+        .hover-lift {
+          transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+        }
+        
+        .hover-lift:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        .hover-glow:hover {
+          text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+          transition: text-shadow 0.3s ease;
+        }
+
+        .stat-card {
+          padding: 1.5rem;
+          border-radius: var(--radius-md);
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid transparent;
+          transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+          background: rgba(255, 255, 255, 0.05);
+          border-color: var(--glass-border);
+        }
+
+        @keyframes float {
+          0% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(5%, 5%) scale(1.1); }
+          100% { transform: translate(-5%, -5%) scale(0.9); }
+        }
+
+        @keyframes pulse {
+          0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
       `}</style>
     </div>

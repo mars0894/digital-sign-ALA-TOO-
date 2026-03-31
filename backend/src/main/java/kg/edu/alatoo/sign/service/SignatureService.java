@@ -58,15 +58,18 @@ public class SignatureService {
                         Float y = el.getY();
                         Float boxWidth = el.getBoxWidth();
                         Float boxHeight = el.getBoxHeight();
+                        String type = el.getType() != null ? el.getType() : "SIGNATURE";
+                        String colorStr = el.getColor() != null ? el.getColor() : "#000000";
+                        Integer fontSize = el.getFontSize() != null ? el.getFontSize() : 16;
 
                         // 1. Physically stamp the PDF if coordinates are provided
                         if (pageNumber != null && x != null && y != null) {
                             pdModified = true;
                             PDPage page = pdDoc.getPage(pageNumber - 1); // 0-indexed in PDFBox
                             
-                            if (signatureData.startsWith("data:image/png;base64,")) {
-                                String b64Image = signatureData.substring("data:image/png;base64,".length());
-                                byte[] imageBytes = Base64.getDecoder().decode(b64Image);
+                            if ("IMAGE".equals(type) || "STAMP".equals(type) || "SIGNATURE".equals(type) && signatureData.startsWith("data:image/")) {
+                                String cleanB64 = signatureData.substring(signatureData.indexOf(",") + 1);
+                                byte[] imageBytes = Base64.getDecoder().decode(cleanB64);
                                 PDImageXObject pdImage = PDImageXObject.createFromByteArray(pdDoc, imageBytes, "signature");
                                 
                                 try (PDPageContentStream contentStream = new PDPageContentStream(pdDoc, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
@@ -76,11 +79,33 @@ public class SignatureService {
                                     contentStream.drawImage(pdImage, x, actualY, drawWidth, drawHeight);
                                 }
                             } else {
-                                // Text signature
+                                // Text/Date annotations or fallback
                                 try (PDPageContentStream contentStream = new PDPageContentStream(pdDoc, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
                                     contentStream.beginText();
-                                    contentStream.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD_OBLIQUE), 16);
-                                    float drawHeight = boxHeight != null ? boxHeight : 16f;
+                                    
+                                    // Set dynamic vector styling
+                                    String fontNameReq = el.getFontName() != null ? el.getFontName().toUpperCase() : "HELVETICA_BOLD_OBLIQUE";
+                                    
+                                    java.awt.Color fontColor;
+                                    try {
+                                        fontColor = java.awt.Color.decode(colorStr);
+                                    } catch (Exception e) {
+                                        fontColor = java.awt.Color.BLACK;
+                                    }
+
+                                    contentStream.setNonStrokingColor(fontColor);
+
+                                    // Select standard PDF box font enum
+                                    Standard14Fonts.FontName selectedFont;
+                                    try {
+                                        selectedFont = Standard14Fonts.FontName.valueOf(fontNameReq);
+                                    } catch (IllegalArgumentException e) {
+                                        selectedFont = Standard14Fonts.FontName.HELVETICA_BOLD_OBLIQUE;
+                                    }
+                                    
+                                    contentStream.setFont(new PDType1Font(selectedFont), fontSize);
+                                    
+                                    float drawHeight = boxHeight != null ? boxHeight : fontSize;
                                     float actualY = page.getMediaBox().getHeight() - (y + drawHeight);
                                     contentStream.newLineAtOffset(x, actualY);
                                     contentStream.showText(signatureData);

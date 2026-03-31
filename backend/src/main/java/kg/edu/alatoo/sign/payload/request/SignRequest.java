@@ -30,5 +30,11 @@ public class SignRequest {
         private Float y;
         private Float boxWidth;
         private Float boxHeight;
+        
+        // Customization explicit fields
+        private String type; // e.g., TEXT, IMAGE, DATE, STAMP
+        private String color; // hex color e.g. #000000
+        private Integer fontSize; // size for text elements
+        private String fontName; // e.g., HELVETICA, COURIER, TIMES_ROMAN
     }
 }
