@@ -1,0 +1,3 @@
+ALTER TABLE documents 
+ADD COLUMN share_token UUID UNIQUE,
+ADD COLUMN share_permission VARCHAR(50) DEFAULT 'VIEWER';

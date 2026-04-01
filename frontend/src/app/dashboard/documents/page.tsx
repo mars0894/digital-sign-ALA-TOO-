@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { authFetch } from '@/lib/auth';
+import { authFetch, getUser } from '@/lib/auth';
 import SignModal from '@/components/dashboard/SignModal';
+import ShareModal from '@/components/dashboard/ShareModal';
 
 interface Document {
   id: string;
@@ -28,13 +29,19 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [activeTab, setActiveTab] = useState<'VAULT' | 'SHARED'>('VAULT');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [signModalDoc, setSignModalDoc] = useState<Document | null>(null);
+  const [shareModalDoc, setShareModalDoc] = useState<Document | null>(null);
+
+  const currentUser = getUser();
 
   async function loadDocs() {
+    setLoading(true);
     try {
-      const res = await authFetch('/documents');
+      const endpoint = activeTab === 'VAULT' ? '/documents' : '/documents/shared';
+      const res = await authFetch(endpoint);
       if (res.ok) setDocs(await res.json());
     } catch (e) {
       setError('Failed to load documents.');
@@ -43,7 +50,7 @@ export default function DocumentsPage() {
     }
   }
 
-  useEffect(() => { loadDocs(); }, []);
+  useEffect(() => { loadDocs(); }, [activeTab]);
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this document? This action cannot be undone.')) return;
@@ -60,10 +67,17 @@ export default function DocumentsPage() {
   }
 
   async function handleDownload(id: string, title: string) {
-    const res = await authFetch(`/documents/${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.downloadUrl) window.open(data.downloadUrl, '_blank');
+    try {
+      const res = await authFetch(`/documents/${id}/download-token`, { method: 'POST' });
+      if (res.ok) {
+        const { token } = await res.json();
+        const downloadUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1') + `/documents/download?token=${token}`;
+        window.open(downloadUrl, '_blank');
+      } else {
+        setError('Failed to get download token.');
+      }
+    } catch (e) {
+      setError('Failed to download document.');
     }
   }
 
@@ -96,6 +110,22 @@ export default function DocumentsPage() {
           {error}
         </div>
       )}
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
+        <button 
+          onClick={() => setActiveTab('VAULT')}
+          style={{ padding: '0.75rem 1rem', background: 'transparent', border: 'none', borderBottom: activeTab === 'VAULT' ? '2px solid var(--color-accent)' : '2px solid transparent', color: activeTab === 'VAULT' ? 'var(--color-accent)' : 'var(--color-text-muted)', fontWeight: activeTab === 'VAULT' ? '600' : '400', cursor: 'pointer', transition: 'all 0.2s' }}
+        >
+          My Vault
+        </button>
+        <button 
+          onClick={() => setActiveTab('SHARED')}
+          style={{ padding: '0.75rem 1rem', background: 'transparent', border: 'none', borderBottom: activeTab === 'SHARED' ? '2px solid var(--color-accent)' : '2px solid transparent', color: activeTab === 'SHARED' ? 'var(--color-accent)' : 'var(--color-text-muted)', fontWeight: activeTab === 'SHARED' ? '600' : '400', cursor: 'pointer', transition: 'all 0.2s' }}
+        >
+          Shared Workspace
+        </button>
+      </div>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -205,16 +235,33 @@ export default function DocumentsPage() {
                       >
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                       </button>
-                      <button
-                        title="Delete"
-                        onClick={() => handleDelete(doc.id)}
-                        disabled={deletingId === doc.id}
-                        style={{ padding: '0.4rem', borderRadius: '6px', background: 'transparent', border: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-text-muted)', transition: 'all 0.15s', display: 'flex', opacity: deletingId === doc.id ? 0.5 : 1 }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
-                      >
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
+                      
+                      {currentUser?.email === doc.ownerEmail && (
+                        <button
+                          title="Share"
+                          onClick={() => setShareModalDoc(doc)}
+                          style={{ padding: '0.4rem', borderRadius: '6px', background: 'transparent', border: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-text-muted)', transition: 'all 0.15s', display: 'flex' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--color-accent)'; e.currentTarget.style.color = 'var(--color-accent)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                          </svg>
+                        </button>
+                      )}
+
+                      {currentUser?.email === doc.ownerEmail && (
+                        <button
+                          title="Delete"
+                          onClick={() => handleDelete(doc.id)}
+                          disabled={deletingId === doc.id}
+                          style={{ padding: '0.4rem', borderRadius: '6px', background: 'transparent', border: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-text-muted)', transition: 'all 0.15s', display: 'flex', opacity: deletingId === doc.id ? 0.5 : 1 }}
+                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+                        >
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -232,6 +279,13 @@ export default function DocumentsPage() {
             loadDocs();
             alert('Document signed successfully!');
           }}
+        />
+
+        <ShareModal
+          isOpen={!!shareModalDoc}
+          onClose={() => setShareModalDoc(null)}
+          documentId={shareModalDoc?.id || ''}
+          documentTitle={shareModalDoc?.title || ''}
         />
 
         <style jsx global>{`

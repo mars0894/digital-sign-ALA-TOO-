@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import kg.edu.alatoo.sign.repository.DocumentCollaboratorRepository;
 
 @Slf4j
 @Service
@@ -31,13 +32,19 @@ public class SignatureService {
 
     private final SignatureRepository signatureRepository;
     private final DocumentRepository documentRepository;
-    private final AuditLogRepository auditLogRepository;
     private final StorageService storageService;
+    private final AuditService auditService;
+    private final DocumentCollaboratorRepository documentCollaboratorRepository;
 
     @Transactional
     public List<Signature> signDocument(UUID documentId, List<SignRequest.SignatureElement> elements, User user) {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document not found"));
+
+        if (!document.getOwner().getId().equals(user.getId())) {
+             documentCollaboratorRepository.findByDocumentIdAndUserId(documentId, user.getId())
+                .orElseThrow(() -> new RuntimeException("Access denied."));
+        }
 
         if (document.getStatus() == DocumentStatus.SIGNED) {
             throw new IllegalStateException("Document is already signed");
@@ -145,14 +152,8 @@ public class SignatureService {
         document.setStatus(DocumentStatus.SIGNED);
         documentRepository.save(document);
 
-        AuditLog auditLog = AuditLog.builder()
-                .entityName("Document")
-                .entityId(document.getId())
-                .action("SIGN")
-                .performedBy(user)
-                .details("Document signed with " + savedSignatures.size() + " elements by " + user.getEmail())
-                .build();
-        auditLogRepository.save(auditLog);
+        auditService.log(user.getEmail(), "SIGN", document.getId().toString(), true, 
+            "Document signed with " + savedSignatures.size() + " elements by " + user.getEmail());
 
         log.info("Document {} signed by user {} with {} elements", documentId, user.getEmail(), savedSignatures.size());
         return savedSignatures;

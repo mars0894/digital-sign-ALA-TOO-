@@ -12,7 +12,7 @@ import java.util.Date;
 @Component
 public class JwtUtils {
 
-    @Value("${jwt.secret:5c345b6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
     @Value("${jwt.expirationSec:86400}")
@@ -44,5 +44,30 @@ public class JwtUtils {
             System.err.println("Invalid JWT token: " + e.getMessage());
         }
         return false;
+    }
+
+    public String generatePreAuthToken(String email) {
+        return Jwts.builder()
+                .setSubject(email)
+                .claim("preauth", true)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 5 * 60 * 1000)) // 5 minutes
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public boolean validatePreAuthToken(String token, String email) {
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+            
+            Boolean isPreAuth = claims.get("preauth", Boolean.class);
+            return isPreAuth != null && isPreAuth && claims.getSubject().equals(email);
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
     }
 }

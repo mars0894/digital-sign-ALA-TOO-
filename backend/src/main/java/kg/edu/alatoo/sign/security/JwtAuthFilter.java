@@ -14,6 +14,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import jakarta.servlet.http.Cookie;
+import java.util.Arrays;
 
 @Component
 @RequiredArgsConstructor
@@ -49,6 +51,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
             return headerAuth.substring(7);
+        }
+
+        if (request.getCookies() != null) {
+            Cookie jwtCookie = Arrays.stream(request.getCookies())
+                    .filter(c -> "jwt_token".equals(c.getName()))
+                    .findFirst()
+                    .orElse(null);
+            if (jwtCookie != null && StringUtils.hasText(jwtCookie.getValue())) {
+                return jwtCookie.getValue();
+            }
         }
 
         return null;

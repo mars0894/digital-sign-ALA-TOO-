@@ -10,7 +10,10 @@ function OAuth2RedirectHandler() {
     const searchParams = useSearchParams();
 
     useEffect(() => {
-        const token = searchParams.get('token');
+        // Extract token from fragment (#token=...) instead of searchParams for security
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const token = params.get('token');
         const error = searchParams.get('error');
 
         if (token) {

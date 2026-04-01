@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { authFetch, getToken } from '@/lib/auth';
+import { authFetch, getToken, getUser } from '@/lib/auth';
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -59,6 +61,30 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
   const [textStyle, setTextStyle] = useState({ css: 'Brush Script MT, cursive', pdf: 'HELVETICA_OBLIQUE', size: 64, color: '#000000' });
   const textCanvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Permission State
+  const [permission, setPermission] = useState<'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER'>('VIEWER');
+  const isViewer = permission === 'VIEWER';
+
+  // Live Cursors
+  const [liveCursors, setLiveCursors] = useState<Record<string, {x: number, y: number, name: string, lastUpdate: number}>>({});
+  const lastCursorEmitRef = useRef<number>(0);
+
+  // Clean stale cursors
+  useEffect(() => {
+     const interval = setInterval(() => {
+        const now = Date.now();
+        setLiveCursors(prev => {
+           const next = { ...prev };
+           let changed = false;
+           for(let k in next) {
+             if (now - next[k].lastUpdate > 5000) { delete next[k]; changed = true; }
+           }
+           return changed ? next : prev;
+        });
+     }, 2000);
+     return () => clearInterval(interval);
+  }, []);
+
   // Vault State
   const [savedSignatures, setSavedSignatures] = useState<any[]>([]);
   const [saveToVault, setSaveToVault] = useState(false);
@@ -74,6 +100,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
   const [extractDrag, setExtractDrag] = useState<any>(null);
 
   const sigCanvas = useRef<SignatureCanvas>(null);
+  const stompClientRef = useRef<Client | null>(null);
 
   async function handleDeleteVaultSig(id: string, e: React.MouseEvent) {
     e.stopPropagation();
@@ -124,25 +151,91 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
         try {
           const res = await authFetch(`/documents/${documentId}`);
           const data = await res.json();
-          if (data.downloadUrl) {
-            const pdfRes = await fetch(data.downloadUrl, { headers: { Authorization: `Bearer ${currentToken}` } });
+
+          const currentUser = getUser();
+          if (currentUser?.email === data.ownerEmail) {
+            setPermission('OWNER');
+          } else {
+             const colsRes = await authFetch(`/documents/${documentId}/collaborators`);
+             if (colsRes.ok) {
+                 const cols = await colsRes.json();
+                 const me = cols.find((c: any) => c.email === currentUser?.email);
+                 if (me) setPermission(me.permissionLevel);
+             }
+          }
+
+          // Securely fetch binary PDF using temporary download token
+          const tokenRes = await authFetch(`/documents/${documentId}/download-token`, { method: 'POST' });
+          if (tokenRes.ok) {
+            const { token: downloadToken } = await tokenRes.json();
+            const downloadUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1') + `/documents/download?token=${downloadToken}`;
+            const pdfRes = await fetch(downloadUrl);
             if (pdfRes.ok) {
               const blob = await pdfRes.blob();
               setPdfUrl(URL.createObjectURL(blob));
             } else throw new Error('Binary fetch fail');
+          } else {
+            throw new Error('Failed to get download token');
           }
         } catch {
           setError('Failed to load document preview');
         }
 
         // Fetch Vault
-        const vaultRes = await authFetch('/saved-signatures');
-        if (vaultRes.ok) setSavedSignatures(await vaultRes.json());
+        if (permission !== 'VIEWER') {
+          const vaultRes = await authFetch('/saved-signatures');
+          if (vaultRes.ok) setSavedSignatures(await vaultRes.json());
+        }
       }
     };
     fetchDoc();
 
     return () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); };
+  }, [isOpen, documentId]);
+
+  useEffect(() => {
+    if (!isOpen || !documentId) return;
+    const token = getToken();
+    const currentUser = getUser();
+    if (!token || !currentUser) return;
+    
+    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1').replace('/api/v1', '/ws');
+    const client = new Client({
+      webSocketFactory: () => new SockJS(socketUrl) as any,
+      connectHeaders: { Authorization: `Bearer ${token}` },
+      onConnect: () => {
+        client.subscribe(`/topic/document/${documentId}`, (message) => {
+           const event = JSON.parse(message.body);
+           if (event.senderEmail === currentUser.email) return; // Skip own echoes
+           
+           if (event.action === 'ADD') {
+             setPlacedElements(prev => {
+                if (prev.find(e => e.id === event.element.id)) return prev;
+                return [...prev, event.element];
+             });
+           } else if (event.action === 'UPDATE') {
+             setPlacedElements(prev => prev.map(e => e.id === event.element.id ? event.element : e));
+           } else if (event.action === 'DELETE') {
+             setPlacedElements(prev => prev.filter(e => e.id !== event.element.id));
+           }
+        });
+
+        client.subscribe(`/topic/document/${documentId}/cursor`, (message) => {
+           const event = JSON.parse(message.body);
+           if (event.senderEmail === currentUser.email) return;
+           
+           setLiveCursors(prev => ({
+             ...prev,
+             [event.senderEmail]: { x: event.x, y: event.y, name: event.userName, lastUpdate: Date.now() }
+           }));
+        });
+      }
+    });
+    
+    client.activate();
+    stompClientRef.current = client;
+    
+    return () => { client.deactivate(); };
   }, [isOpen, documentId]);
 
   if (!isOpen) return null;
@@ -196,16 +289,25 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
     const targetW = width > 300 ? 300 : Math.max(width, 100);
     const targetH = targetW / ratio;
 
-    setPlacedElements(prev => [...prev, {
+    const newEl = {
       id: Math.random().toString(36).substring(7),
       signatureData: data,
       pageNumber: pageNumber,
-      x: 50 + ((prev.length * 20) % 200),
-      y: 100 + ((prev.length * 20) % 200),
+      x: 50 + ((placedElements.length * 20) % 200),
+      y: 100 + ((placedElements.length * 20) % 200),
       width: targetW,
       height: targetH,
       ...overrides
-    }]);
+    };
+
+    setPlacedElements(prev => [...prev, newEl]);
+    
+    if (stompClientRef.current?.connected) {
+       stompClientRef.current.publish({
+          destination: `/app/document/${documentId}/event`,
+          body: JSON.stringify({ action: 'ADD', senderEmail: getUser()?.email, element: newEl })
+       });
+    }
 
     // Handle vault auto-saving silently
     if (vaultSaveReq) {
@@ -347,13 +449,20 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
 
   function handleDuplicateElement(el: PlacedElement) {
     const newId = Math.random().toString(36).substring(7);
-    setPlacedElements(prev => [...prev, {
+    const newEl = {
       ...el,
       id: newId,
       x: el.x + 30,
       y: el.y + 30
-    }]);
+    };
+    setPlacedElements(prev => [...prev, newEl]);
     setSelectedElementId(newId);
+    if (stompClientRef.current?.connected) {
+       stompClientRef.current.publish({
+          destination: `/app/document/${documentId}/event`,
+          body: JSON.stringify({ action: 'ADD', senderEmail: getUser()?.email, element: newEl })
+       });
+    }
   }
 
   async function handleSaveToVaultQuick(el: PlacedElement) {
@@ -390,26 +499,52 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
       setDragState({ mode: 'resize', id: el.id, startX: e.clientX, startY: e.clientY, initialElement: { ...el } });
     },
     onMouseMove: (e: React.MouseEvent) => {
-      if (!dragState) return;
-      const dx = e.clientX - dragState.startX;
-      const dy = e.clientY - dragState.startY;
-      setPlacedElements(prev => prev.map(el => {
-        if (el.id !== dragState.id) return el;
-        if (dragState.mode === 'drag') {
-          return { ...el, x: dragState.initialElement.x + dx, y: dragState.initialElement.y + dy };
-        } else {
-          // Proportional scale to preserve signature aspect ratio perfectly
-          const initialRatio = dragState.initialElement.height / dragState.initialElement.width;
-          // Use the largest movement vector to determine scale direction
-          const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
-          const newWidth = Math.max(40, dragState.initialElement.width + delta);
-          const newHeight = newWidth * initialRatio;
-          
-          return { ...el, width: newWidth, height: newHeight };
-        }
-      }));
+      // Handle drag
+      if (dragState) {
+        const dx = e.clientX - dragState.startX;
+        const dy = e.clientY - dragState.startY;
+        setPlacedElements(prev => prev.map(el => {
+          if (el.id !== dragState.id) return el;
+          if (dragState.mode === 'drag') {
+            return { ...el, x: dragState.initialElement.x + dx, y: dragState.initialElement.y + dy };
+          } else {
+            const initialRatio = dragState.initialElement.height / dragState.initialElement.width;
+            const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+            const newWidth = Math.max(40, dragState.initialElement.width + delta);
+            const newHeight = newWidth * initialRatio;
+            return { ...el, width: newWidth, height: newHeight };
+          }
+        }));
+      }
+
+      // Handle cursor broadcast
+      const now = Date.now();
+      if (now - lastCursorEmitRef.current > 50 && stompClientRef.current?.connected) {
+         const rect = containerRef.current?.getBoundingClientRect();
+         if (rect) {
+             const x = e.clientX - rect.left;
+             const y = e.clientY - rect.top;
+             stompClientRef.current.publish({
+                destination: `/app/document/${documentId}/cursor`,
+                body: JSON.stringify({ documentId, senderEmail: getUser()?.email, x, y, userName: getUser()?.firstName })
+             });
+             lastCursorEmitRef.current = now;
+         }
+      }
     },
-    onMouseUp: () => setDragState(null)
+    onMouseUp: () => {
+      if (dragState && stompClientRef.current?.connected) {
+         // Fire UPDATE event when dragging or scaling stops
+         const el = placedElements.find(e => e.id === dragState.id);
+         if (el) {
+             stompClientRef.current.publish({
+                destination: `/app/document/${documentId}/event`,
+                body: JSON.stringify({ action: 'UPDATE', senderEmail: getUser()?.email, element: el })
+             });
+         }
+      }
+      setDragState(null);
+    }
   };
 
   // Extractor specific generic mouse handler
@@ -480,28 +615,50 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                     {placedElements.filter(e => e.pageNumber === pageNumber).map(el => {
                       const isSelected = selectedElementId === el.id;
                       return (
-                      <div onMouseDown={(e) => docHandlers.onBoxMouseDown(e, el)} key={el.id} style={{ position: 'absolute', left: el.x, top: el.y, width: el.width, height: el.height, border: isSelected ? '2px dashed #3b82f6' : '1px dashed transparent', outline: isSelected ? 'none' : '2px dashed rgba(16, 185, 129, 0.4)', cursor: dragState?.id === el.id && dragState.mode === 'drag' ? 'grabbing' : 'grab', display: 'flex' }}>
+                      <div onMouseDown={(e) => { if (!isViewer) docHandlers.onBoxMouseDown(e, el); }} key={el.id} style={{ position: 'absolute', left: el.x, top: el.y, width: el.width, height: el.height, border: isSelected ? '2px dashed #3b82f6' : '1px dashed transparent', outline: isSelected ? 'none' : (!isViewer ? '2px dashed rgba(16, 185, 129, 0.4)' : 'none'), cursor: isViewer ? 'default' : (dragState?.id === el.id && dragState.mode === 'drag' ? 'grabbing' : 'grab'), display: 'flex', zIndex: 10 }}>
                          
                          {el.type === 'TEXT' ? (
-                           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', color: el.color, fontSize: `${(el.width / Math.max(10, el.signatureData.length))}px`, whiteSpace: 'nowrap', opacity: isSelected ? 1 : 0.95, fontFamily: el.fontName === 'COURIER' ? 'monospace' : el.fontName === 'TIMES_ROMAN' ? 'serif' : 'Arial, sans-serif', fontStyle: el.fontName === 'HELVETICA_OBLIQUE' || el.fontName === 'TIMES_ITALIC' ? 'italic' : 'normal', fontWeight: el.fontName?.includes('BOLD') ? 'bold' : 'normal' }}>{el.signatureData}</div>
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', color: el.color, fontSize: `${(el.width / Math.max(10, el.signatureData.length))}px`, whiteSpace: 'nowrap', opacity: isSelected ? 1 : 0.95, fontFamily: el.fontName === 'COURIER' ? 'monospace' : el.fontName === 'TIMES_ROMAN' ? 'serif' : 'Arial, sans-serif', fontStyle: el.fontName === 'HELVETICA_OBLIQUE' || el.fontName === 'TIMES_ITALIC' ? 'italic' : 'normal', fontWeight: el.fontName?.includes('BOLD') ? 'bold' : 'normal', pointerEvents: 'none' }}>{el.signatureData}</div>
                          ) : (
-                           // eslint-disable-next-line @next/next/no-img-element
-                           <img src={el.signatureData} alt="Element" style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: isSelected ? 1 : 0.95 }} draggable={false}/>
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={el.signatureData} alt="Element" style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: isSelected ? 1 : 0.95, pointerEvents: 'none' }} draggable={false}/>
                          )}
                          
                          {isSelected && (
                            <>
                              <div onMouseDown={(e) => docHandlers.onResizeMouseDown(e, el)} style={{ position: 'absolute', bottom: '-4px', right: '-4px', width: '16px', height: '16px', background: '#3b82f6', borderRadius: '50%', cursor: 'nwse-resize', border: '2px solid white', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
-                             <div style={{ position: 'absolute', top: '-40px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', background: 'rgba(20, 25, 35, 0.95)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', zIndex: 10 }}>
+                             <div style={{ position: 'absolute', top: '-40px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '8px', background: 'rgba(20, 25, 35, 0.95)', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)', zIndex: 20 }}>
                                <button title="Duplicate" onMouseDown={(e) => { e.stopPropagation(); handleDuplicateElement(el); }} style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: '2px', display: 'flex' }}><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
                                <button title="Save Vault" onMouseDown={(e) => { e.stopPropagation(); handleSaveToVaultQuick(el); }} style={{ background: 'none', border: 'none', color: '#6ee7b7', cursor: 'pointer', padding: '2px', display: 'flex' }}><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg></button>
                                <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-                               <button title="Delete" onMouseDown={(e) => { e.stopPropagation(); setPlacedElements(prev => prev.filter(p => p.id !== el.id)); setSelectedElementId(null); }} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', padding: '2px', display: 'flex' }}><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                               <button title="Delete" onMouseDown={(e) => { 
+                                  e.stopPropagation(); 
+                                  setPlacedElements(prev => prev.filter(p => p.id !== el.id)); 
+                                  setSelectedElementId(null); 
+                                  if (stompClientRef.current?.connected) {
+                                      stompClientRef.current.publish({
+                                         destination: `/app/document/${documentId}/event`,
+                                         body: JSON.stringify({ action: 'DELETE', senderEmail: getUser()?.email, element: { id: el.id } })
+                                      });
+                                  }
+                               }} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', padding: '2px', display: 'flex' }}><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                              </div>
                            </>
                          )}
                       </div>
                     )})}
+
+                    {/* Render Foreign Cursors */}
+                    {Object.values(liveCursors).map((cursor, idx) => (
+                      <div key={idx} style={{ position: 'absolute', left: cursor.x, top: cursor.y, pointerEvents: 'none', zIndex: 100, transition: 'all 0.05s linear' }}>
+                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>
+                            <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 01.35-.15h6.84c.45 0 .67-.54.35-.85L6.35 2.85a.5.5 0 00-.85.35z" fill="#3b82f6" stroke="white" strokeWidth="1.5" />
+                         </svg>
+                         <div style={{ position: 'absolute', top: '24px', left: '12px', background: '#3b82f6', color: 'white', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                           {cursor.name}
+                         </div>
+                      </div>
+                    ))}
                   </div>
                 </Document>
               )}
@@ -509,6 +666,13 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
           </div>
 
           {/* RIGHT PANELS: Input Method (Now Left Sidebar via row-reverse) */}
+          {isViewer ? (
+            <div style={{ width: '380px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'rgba(20, 25, 35, 0.4)', borderRadius: '12px', border: '1px solid var(--color-border)', backdropFilter: 'blur(10px)', padding: '2rem', textAlign: 'center', justifyContent: 'center', alignItems: 'center' }}>
+               <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="var(--color-text-muted)" strokeWidth={1.5} style={{ marginBottom: '1rem' }}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+               <h3 style={{ color: 'var(--color-text-main)', margin: '0 0 1rem 0' }}>View Only</h3>
+               <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', lineHeight: 1.5 }}>You have Viewer privileges for this workspace.<br/><br/>The editing toolkit and signing features are disabled to protect the integrity of the document.</p>
+            </div>
+          ) : (
           <div style={{ width: '380px', flexShrink: 0, display: 'flex', flexDirection: 'column', background: 'rgba(20, 25, 35, 0.4)', borderRadius: '12px', border: '1px solid var(--color-border)', backdropFilter: 'blur(10px)' }}>
             
             {/* Tab Header */}
@@ -754,6 +918,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
               </button>
             </div>
           </div>
+          )}
 
         </div>
       </div>

@@ -9,12 +9,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import org.apache.tika.Tika;
+import java.util.Arrays;
+import java.util.List;
 
 @Slf4j
 @Service
 public class StorageService {
 
     private final String storageDir = "local_storage";
+    private final Tika tika = new Tika();
+    private final List<String> allowedMimeTypes = Arrays.asList(
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/msword",
+        "image/jpeg",
+        "image/png"
+    );
 
     @PostConstruct
     public void init() {
@@ -27,6 +38,14 @@ public class StorageService {
     }
 
     public String uploadFile(String key, byte[] data, String contentType) {
+        String detectedType = tika.detect(data);
+        log.info("Detected MIME type: {}", detectedType);
+
+        if (!allowedMimeTypes.contains(detectedType)) {
+            log.error("Security alert: Attempted upload of forbidden file type: {}", detectedType);
+            throw new RuntimeException("Invalid file type detected. Only PDF, Office documents, and images are allowed.");
+        }
+
         try {
             Path filePath = Paths.get(storageDir, key);
             Files.createDirectories(filePath.getParent());
@@ -40,8 +59,15 @@ public class StorageService {
     }
 
     public byte[] getFile(String key) {
+        if (key == null || key.contains("..") || key.startsWith("/") || key.startsWith("\\")) {
+             throw new IllegalArgumentException("Invalid storage key provided.");
+        }
         try {
-            return Files.readAllBytes(Paths.get(storageDir, key));
+            Path filePath = Paths.get(storageDir, key).normalize();
+            if (!filePath.startsWith(Paths.get(storageDir).normalize())) {
+                throw new IllegalArgumentException("Path traversal attempt detected!");
+            }
+            return Files.readAllBytes(filePath);
         } catch (IOException e) {
             throw new RuntimeException("File not found");
         }

@@ -8,13 +8,13 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "documents")
+@Table(name = "system_notifications")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Document {
+public class SystemNotification {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -22,26 +22,19 @@ public class Document {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    private User owner;
+    private User targetUser;
 
     @Column(nullable = false)
     private String title;
 
-    @Column(name = "original_file_key", nullable = false, length = 500)
-    private String originalFileKey;
+    @Column(nullable = false, length = 1000)
+    private String message;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false)
     @Builder.Default
-    private DocumentStatus status = DocumentStatus.DRAFT;
+    private boolean read = false;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-
-    @Column(name = "share_token")
-    private UUID shareToken;
-
-    @Column(name = "share_permission", length = 50)
-    private String sharePermission;
 }

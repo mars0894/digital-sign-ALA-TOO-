@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { saveAuth } from '@/lib/auth';
+import { saveAuth, verify2fa } from '@/lib/auth';
 import { API_URL } from '@/lib/api';
 
 export default function LoginPage() {
@@ -12,6 +12,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [show2fa, setShow2fa] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [preAuthToken, setPreAuthToken] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,6 +27,7 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -31,6 +35,13 @@ export default function LoginPage() {
 
       if (!res.ok) {
         throw new Error(data.message || 'Login failed');
+      }
+
+      if (data.message === '2FA_REQUIRED') {
+        setPreAuthToken(data.preAuthToken);
+        setShow2fa(true);
+        setLoading(false);
+        return;
       }
 
       saveAuth(data.token, {
@@ -42,6 +53,25 @@ export default function LoginPage() {
       });
 
       router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify2fa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const success = await verify2fa(email, twoFactorCode, preAuthToken);
+      if (success) {
+        router.push('/dashboard');
+      } else {
+        setError('Invalid verification code');
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -65,47 +95,85 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '500' }}>Email Address</label>
-            <input 
-              type="email" 
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="form-input"
-              placeholder="name@alatoo.edu.kg"
-              style={{ width: '100%', padding: '0.875rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-main)', fontSize: '1rem', transition: 'all 0.2s', outline: 'none' }}
-              onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
-              onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-            />
-          </div>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <label style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '500' }}>Password</label>
-              <Link href="#" style={{ fontSize: '0.875rem', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: '500', transition: 'color 0.2s' }}>Forgot?</Link>
+        {show2fa ? (
+          <form onSubmit={handleVerify2fa} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '500' }}>Verification Code</label>
+              <input 
+                type="text" 
+                required
+                value={twoFactorCode}
+                onChange={(e) => setTwoFactorCode(e.target.value)}
+                className="form-input"
+                placeholder="000000"
+                maxLength={6}
+                style={{ width: '100%', padding: '0.875rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-main)', fontSize: '1.25rem', letterSpacing: '0.5rem', textAlign: 'center', transition: 'all 0.2s', outline: 'none' }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+              />
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
+                We've sent a 6-digit code to {email}
+              </p>
             </div>
-            <input 
-              type="password" 
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="form-input"
-              placeholder="••••••••"
-              style={{ width: '100%', padding: '0.875rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-main)', fontSize: '1rem', transition: 'all 0.2s', outline: 'none' }}
-              onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
-              onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-            />
-          </div>
-          <button 
-            type="submit" 
-            className="btn-primary" 
-            disabled={loading}
-            style={{ width: '100%', padding: '0.875rem', marginTop: '1rem', borderRadius: '12px', opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
-          >
-            {loading ? 'Signing In...' : 'Sign In'}
-          </button>
-        </form>
+            <button 
+              type="submit" 
+              className="btn-primary" 
+              disabled={loading}
+              style={{ width: '100%', padding: '0.875rem', marginTop: '1rem', borderRadius: '12px', opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
+            >
+              {loading ? 'Verifying...' : 'Verify & Sign In'}
+            </button>
+            <button 
+              type="button"
+              onClick={() => setShow2fa(false)}
+              style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', fontSize: '0.875rem', cursor: 'pointer' }}
+            >
+              Back to Login
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '500' }}>Email Address</label>
+              <input 
+                type="email" 
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="form-input"
+                placeholder="name@alatoo.edu.kg"
+                style={{ width: '100%', padding: '0.875rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-main)', fontSize: '1rem', transition: 'all 0.2s', outline: 'none' }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+              />
+            </div>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <label style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: '500' }}>Password</label>
+                <Link href="#" style={{ fontSize: '0.875rem', color: 'var(--color-primary)', textDecoration: 'none', fontWeight: '500', transition: 'color 0.2s' }}>Forgot?</Link>
+              </div>
+              <input 
+                type="password" 
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="form-input"
+                placeholder="••••••••"
+                style={{ width: '100%', padding: '0.875rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'var(--color-text-main)', fontSize: '1rem', transition: 'all 0.2s', outline: 'none' }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+              />
+            </div>
+            <button 
+              type="submit" 
+              className="btn-primary" 
+              disabled={loading}
+              style={{ width: '100%', padding: '0.875rem', marginTop: '1rem', borderRadius: '12px', opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
+            >
+              {loading ? 'Signing In...' : 'Sign In'}
+            </button>
+          </form>
+        )}
 
         <p style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
           Don't have an account?{' '}

@@ -1,5 +1,6 @@
 server:
   port: 8081
+  forward-headers-strategy: native
 
 spring:
   application:
@@ -9,9 +10,13 @@ spring:
       client:
         registration:
           google:
-            client-id: ${GOOGLE_CLIENT_ID:mock-google-client-id}
-            client-secret: ${GOOGLE_CLIENT_SECRET:mock-google-client-secret}
+            client-id: ${GOOGLE_CLIENT_ID:dev-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:dev-secret}
             scope: profile, email
+    servlet:
+      multipart:
+        max-file-size: 20MB
+        max-request-size: 25MB
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:5432/alatoosign
     username: ${DB_USERNAME:alatoo}
@@ -21,7 +26,7 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -29,8 +34,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    username: ${MAIL_USERNAME:dev-user}
+    password: ${MAIL_PASSWORD:dev-pass}
     properties:
       mail:
         smtp:
@@ -50,8 +55,12 @@ aws:
     bucket: digital-signatures
 
 jwt:
-  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  secret: ${JWT_SECRET}
   expiration: 86400000 # 24 hours
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 logging:
   level:

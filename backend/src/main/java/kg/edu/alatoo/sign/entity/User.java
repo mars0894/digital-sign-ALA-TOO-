@@ -38,9 +38,15 @@ public class User implements UserDetails {
     @Column(name = "last_name", nullable = false)
     private String lastName;
 
-    @Column(name = "is_active")
     @Builder.Default
     private boolean isActive = true;
+
+    @Column(name = "two_factor_enabled")
+    @Builder.Default
+    private boolean twoFactorEnabled = false;
+
+    @Column(name = "two_factor_secret")
+    private String twoFactorSecret;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -1,3 +1,61 @@
-﻿build_output*.txt
+# Compiled class files
+*.class
+
+# Log files
+*.log
+backend/boot.log
+backend_startup.log
+frontend_startup.log
+out.log
+out_utf8.log
+
+# Blueprints
+.idea/
+.vscode/
+*.iml
+
+# Package files
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Build directories
+target/
+.next/
+out/
+build/
+dist/
+
+# Dependency directories
+node_modules/
+jspm_packages/
+bower_components/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Storage & Temporary
 backend/local_storage/
-backend/out.log
+backend/document_storage/
+fake.pdf
+large_file.pdf
+temp_*.pdf
+audit_test_*.sql
+
+# System generated
+implementation_plan.md
+task.md
+walkthrough.md
+security_audit_report.md
+.gemini/
