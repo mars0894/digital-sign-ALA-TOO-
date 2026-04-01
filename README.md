@@ -33,6 +33,28 @@ Welcome to the **Noir Edition**—a mission-critical transformation of the Ala-T
 
 ---
 
+## 🏛️ The Noir Privilege: Architectural Superiority
+
+Compared to the foundational version (main), the **Noir Edition** provides a significantly more professional and resilient infrastructure. Here is why Noir is the institutional standard for **Ala-Too International University**.
+
+### 1. 🛡️ The Session Privilege (Anti-XSS Architecture)
+In the standard version, identity tokens are stored in `localStorage`. This makes them vulnerable to **Cross-Site Scripting (XSS)**—if a hacker injects a single line of JS, your session is gone.
+- **Noir Advantage:** We use **HttpOnly** cookies that are physically inaccessible to JavaScript. Even if an attacker finds an injection point, they *cannot* steal your identity. Your session belongs to the browser, not the script.
+
+### 2. 📂 The File Integrity Privilege (Deep-Stream Scanning)
+Foundational systems trust the file extension (e.g., `.pdf`). A sophisticated attacker can rename a malicious script to `.pdf` and bypass simple filters.
+- **Noir Advantage:** We integrated **Apache Tika**. Every file you upload is opened at the binary level. We verify the actual "Magic Bytes" of the hardware signature. If the code says it's a script but the name says it's a PDF, Noir kills the upload instantly.
+
+### 3. 👥 The Collaborative Privilege (Live Workspaces)
+Standard document tools are isolated. You upload, you sign, you download.
+- **Noir Advantage:** Transition from a "Document tool" to a **"Digital Headquarters"**. With **STOMP WebSockets**, your team can work on the same document simultaneously. Cursors, signature placements, and comments are synchronized in milliseconds, eliminating the "email-ping-pong" of traditional signing.
+
+### 4. ⚡ The Resilience Privilege (DoS Defenses)
+Public portals are prime targets for **Denial of Service** attacks. A user could upload a 500MB "zip bomb" to crash the server memory.
+- **Noir Advantage:** Noir implements a strict **20MB Tomcat buffer** and **30-second execution timeouts** on the Gotenberg conversion engine. The system is designed to sever hostile connections automatically to preserve the core university infrastructure.
+
+---
+
 ## 🔒 Security Showcase: The "Noir Guard"
 
 ![Security Guard Meme](docs/images/security_guard_meme.png)
@@ -54,19 +76,6 @@ graph LR
     D -- 4. Ownership Check --> E[Business Logic]
     F[File Stream] -- 5. Magic Byte Scan --> E
 ```
-
----
-
-## 👥 Deep-Dive: Collaborators Mode
-
-In the **Noir Edition**, documents are never silos. Transitioning from **"My Files"** to **"Our Workspace"**:
-
-| Feature | Description |
-| :--- | :--- |
-| **Granular Roles** | Assign `OWNER`, `EDITOR`, or `VIEWER` to any collaborator. |
-| **WebSocket Sync** | Every signature placement is broadcast in <50ms. |
-| **Live Presence** | See exactly who is viewing the document in real-time. |
-| **Secure Sharing** | Obfuscated links and temporary access tokens for downloads. |
 
 ---
 
