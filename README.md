@@ -1,6 +1,6 @@
 # 🖋️ Ala-Too Digital Signature Platform (Noir Edition)
 
-![Noir Banner](/absolute/path/to/noir_edition_banner_1775007506098.png)
+![Noir Banner](docs/images/noir_banner.png)
 
 [![Security Hardened](https://img.shields.io/badge/Security-Noir--Hardened-00ff00?style=for-the-badge&logo=springsecurity)](https://github.com/mars0894/digital-sign-ALA-TOO-/blob/Noir.version/security_audit_report.md)
 [![Collaborative](https://img.shields.io/badge/Workspace-Collaborative-3b82f6?style=for-the-badge&logo=socket.io)](https://github.com/mars0894/digital-sign-ALA-TOO-/tree/Noir.version)
@@ -35,7 +35,7 @@ Welcome to the **Noir Edition**—a mission-critical transformation of the Ala-T
 
 ## 🔒 Security Showcase: The "Noir Guard"
 
-![Security Guard Meme](/absolute/path/to/security_guard_meme_1775007627187.png)
+![Security Guard Meme](docs/images/security_guard_meme.png)
 
 The **Noir Edition** implements a multi-layered defense strategy to protect institutional data.
 
