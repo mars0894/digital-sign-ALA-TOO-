@@ -1,93 +1,83 @@
 # 🖋️ Ala-Too Digital Signature Platform (Noir Edition)
 
 [![Security Status](https://img.shields.io/badge/Security-Hardened-brightgreen?style=for-the-badge&logo=springsecurity)](https://github.com/mars0894/digital-sign-ALA-TOO-/blob/Noir.version/security_audit_report.md)
-[![Build Status](https://img.shields.io/badge/Version-Noir-black?style=for-the-badge&logo=github)](https://github.com/mars0894/digital-sign-ALA-TOO-/tree/Noir.version)
+[![Features](https://img.shields.io/badge/Version-Noir-black?style=for-the-badge&logo=github)](https://github.com/mars0894/digital-sign-ALA-TOO-/tree/Noir.version)
 
-A mission-critical, enterprise-grade digital signature and document collaboration ecosystem developed for **Ala-Too International University**. Built with **Spring Boot 3 (Java 21)** and **Next.js 16**, the platform focuses on robust file integrity, real-time synchronization, and industry-standard security.
+Welcome to the **Noir Edition** of the Ala-Too Digital Signature platform—a mission-critical, enterprise-grade document ecosystem specifically designed for **Ala-Too International University**. 
 
----
-
-## ✨ Primary Features
-
-### 🔐 Ironclad Authentication & Identity
-- **2FA (Two-Factor Authentication):** Mandatory email-based secondary verification for all account-level transitions.
-- **Enterprise SSO:** Native support for **Google** and **Microsoft** OAuth2 login flows.
-- **Cookie-Based Sessions:** Transitioned away from vulnerable `localStorage` to **HttpOnly**, **Secure**, and **SameSite=Strict** cookies, neutralizing automated XSS session theft.
-
-### 📄 Intelligent Document Management
-- **Universal Conversion:** Built-in pipeline for converting Word (`.docx`), Excel (`.xlsx`), and common Image formats to standardized PDF via **Gotenberg**.
-- **Vector-Level Signing:** High-precision PDF signature injection using **Apache PDFBox**, supporting custom coordinate positioning and dynamic scaling.
-- **Secure Storage:** Hybrid storage support (Local Disk/AWS S3) with cryptographic tokenization for public access links.
-
-### 👥 Real-Time Collaboration (Live)
-- **STOMP WebSockets:** Instant structural updates and cursors during shared signing sessions.
-- **Granular Sharing:** Permission-based collaboration access (Owner, Editor, Manager, Viewer).
-- **Notification Engine:** Live in-dashboard notifications for document shares, signature requests, and system alerts.
+This branch isn't just an update; it's a complete architectural overhaul. Compared to the foundational version, the **Noir Edition** introduces a state-of-the-art security perimeter, industry-leading file integrity controls, and an advanced real-time collaboration engine.
 
 ---
 
-## 🛡️ The "Noir" Security Architecture
+## 🏆 Why Choose the Noir Version?
 
-The platform's security posture is built on a **Defense-in-Depth** model designed to mitigate the **OWASP Top 10** vulnerabilities.
+The **Noir Edition** is the only version of the platform built for production-ready security. It addresses every core vulnerability in the early prototype while introducing a premium feature set focused on high-speed institutional workflows.
 
-### 🚀 Attack Mitigation Strategy
-```mermaid
-graph TD
-    A[Public Web Traffic] -->|HSTS / HTTPS / CSP| B(Edge Security)
-    B -->|Rate Limiter (Bucket4j)| C(Spring Security Gateway)
-    C -->|CSRF XSRF-TOKEN Sync| D(Auth Controller)
-    D -->|JWT Authentication| E(Business Logic Layer)
-    E -->|BOLA/IDOR Permission Filter| F(Database / Storage)
-    G[Incoming Payloads] -->|Apache Tika (Magic Bytes)| E
-    H[Conversion Pipeline] -->|DoS Timeout Controls| I(Gotenberg Container)
-```
-
-### 🔒 Core Security Paradigms
-- **Broken Object Level Authorization (BOLA):** Every document access point requires explicit `DocumentCollaboratorRepository` validation. It is impossible to "guess" a document ID and perform actions without authorized ownership.
-- **SQL Injection Prevention:** 100% reliance on **Spring Data JPA** and **Hibernate Criteria API** to ensure zero raw SQL query leakage.
-- **Payload Integrity:** Every uploaded file is scanned using **Apache Tika**. Even if a file name is `report.pdf`, the system will reject it if the underlying binary signature indicates an executable or script.
-- **DoS Resistance:** Strict **Tomcat multipart caps** (20MB) and **RestTemplate timeouts** prevent "Zip Bomb" payloads from crashing the server nodes.
+| Feature Area | Foundation (Main) | **Noir Edition** (Hardened) |
+| :--- | :--- | :--- |
+| **Identity Protection** | Basic JWT in LocalStorage | **HttpOnly + Secure + SameSite Cookies** (XSS Defended) |
+| **File Integrity** | Extension-based Trusts | **Hardware Magic-Byte Scan (Apache Tika)** |
+| **Real-Time Sync** | ❌ None | **Live Cursors & WebSockets (STOMP)** |
+| **Collaboration** | Single User Only | **Multi-User Permission Tiers** (Collaborators Mode) |
+| **Conversion Pipeline** | Basic PDF support | **Full Office-to-PDF Conversion (Gotenberg)** |
+| **DoS Resilience** | ❌ Vulnerable to Large Payloads | **Uncapped CPU Timeout & Request Thresholds** |
+| **Audit Logs** | ❌ None | **Forensic User Action Tracking** |
 
 ---
 
-## 🏗️ Technical Stack
+## 👥 Spotlight: Collaborators Mode (Beta)
 
-- **Backend:** Java 21, Spring Boot 3.3, Spring Security, Spring WebSocket (STOMP), JPA Hibernate, Flyway.
-- **Frontend:** Next.js 16 (App Router), TypeScript, TailwindCSS, Lucide Icons, Framer Motion.
-- **Integrations:** Redis (Caching), Gotenberg (PDF Conversion), Apache PDFBox (PDF Processing), Apache Tika (MIME Detection).
+The **Noir Edition** introduces the most requested feature: **Collaborators Mode**. This allows users to work on a single document simultaneously without overwriting each other's work.
+
+- **STOMP WebSocket Synchronization:** All movements, signatures, and deletions are broadcast to active collaborators in milliseconds. 
+- **Live User Presence:** See exactly who is on the document page with live status indicators and real-time cursors.
+- **Hierarchy of Permission:** Managers can delegate document access with surgical precision:
+  - **OWNER**: Absolute control, can delete/sign/share.
+  - **MANAGER**: Can share and edit the document structure.
+  - **EDITOR**: Can add signature fields and move elements.
+  - **VIEWER**: Can only view the document and see live signing updates.
+
+---
+
+## 🛡️ Superior Security: The Noir Perimeter
+
+The platform has been rebuilt around a **Defense-in-Depth** security model to neutralize common web attacks:
+
+### 🚀 Attack Mitigation
+- **XSS & Session Hijacking:** By moving the JWT to an **HttpOnly** cookie, we prevent all client-side scripts from reading the user's session token.
+- **BOLA (Broken Object Level Authorization):** Every database query is intercepted and validated against the calling user's permissions. You can't guess a document UUID; you must *own* it or be *invited* to it.
+- **Magic Byte Validation:** Our backend uses **Apache Tika** to strip open every upload. We verify the file's raw binary signature before it even touches the disk. 
+- **CSRF Defense:** We use a `CsrfCookieFilter` to synchronize tokens between the backend and frontend headers (`X-XSRF-TOKEN`), effectively blocking malicious form submissions.
+
+---
+
+## 🎨 Professional Next-Gen UI (Frontend)
+
+Built with **Next.js 16 (App Router)** for maximum SEO and performance:
+- **Responsive Dashboard:** A dark-mode ready, premium-themed dashboard optimized for all screen sizes.
+- **Animated PDF Interactions:** Smooth UI transitions for signing, placing text, and resizing vector elements.
+- **Instant Previews:** High-speed document rendering with the native PDF viewer engine.
+
+---
+
+## ⚙️ Hardened Powerhouse (Backend)
+
+The **Noir Edition** leverages a high-performance stack:
+- **Java 21 & Spring Boot 3.3:** Taking full advantage of virtual threads and the latest security patches.
+- **Gotenberg Microservice:** Industry-standard Office document conversion that runs in a secure, isolated container.
+- **PostgreSQL + Flyway:** Atomic, verifiable database migrations ensuring 100% data integrity during updates.
+- **Bucket4j Rate Limiting:** Built-in protection against brute-force login attempts and API scrapers.
 
 ---
 
 ## 🚀 Getting Started
 
-### 📦 Installation
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/mars0894/digital-sign-ALA-TOO-.git
-    git checkout Noir.version
-    ```
-2.  Setup environment variables (see `.env.example`).
-3.  Launch the backend service:
-    ```bash
-    cd backend
-    ./mvnw spring-boot:run
-    ```
-4.  Launch the frontend dashboard:
-    ```bash
-    cd frontend
-    npm install
-    npm run dev
-    ```
-
----
-
-## 📈 Security Audit Results
-The platform has been audited against standard penetration testing payloads. See the full [Security Audit Report](file:///C:/Users/vasil/.gemini/antigravity/brain/0e65705f-121b-49d8-9463-a5e4a38c13d6/security_audit_report.md) for detailed results on **SQLi**, **XSS**, and **IDOR** remediation.
-
----
-
-## 👨‍💻 Contributing
-This project is developed under the **Noir Security Standard**. All pull requests must include a corresponding security impact assessment and pass automated linting checks.
+1.  **Clone the Repo:** `git clone https://github.com/mars0894/digital-sign-ALA-TOO-.git`
+2.  **Switch to Noir:** `git checkout Noir.version`
+3.  **Local Deploy:** 
+    - Launch the Backend: `./mvnw spring-boot:run`
+    - Launch the Frontend: `npm run dev`
+4.  **Production Deploy:** Use the provided `docker-compose.prod.yml` for an optimized, Nginx-proxied stack.
 
 ---
 **Developed for Ala-Too International University | 2026**
