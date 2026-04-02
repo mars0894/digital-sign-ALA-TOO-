@@ -89,7 +89,7 @@ public class DocumentService {
      */
     @Transactional(readOnly = true)
     public List<DocumentResponse> listDocuments(User owner) {
-        return documentRepository.findByOwnerIdOrderByCreatedAtDesc(owner.getId())
+        return documentRepository.findByOwnerIdAndStatusNotOrderByCreatedAtDesc(owner.getId(), DocumentStatus.REJECTED)
                 .stream()
                 .map(doc -> toResponse(doc, null))
                 .collect(Collectors.toList());
@@ -108,11 +108,14 @@ public class DocumentService {
     }
 
     /**
-     * Download the physical PDF file
+     * Download the physical PDF file (with ownership verification).
      */
     @Transactional(readOnly = true)
-    public byte[] getFileData(String key) {
-        // Simple security can be added here if needed, but the keys are UUID based
+    public byte[] getFileData(String key, User owner) {
+        boolean ownsDocument = documentRepository.existsByOriginalFileKeyAndOwnerId(key, owner.getId());
+        if (!ownsDocument) {
+            throw new RuntimeException("Document not found or access denied.");
+        }
         return storageService.getFile(key);
     }
 
@@ -137,7 +140,7 @@ public class DocumentService {
     public Map<String, Long> getStats(User owner) {
         UUID uid = owner.getId();
         return Map.of(
-                "total", documentRepository.countByOwnerId(uid),
+                "total", documentRepository.countByOwnerIdAndStatusNot(uid, DocumentStatus.REJECTED),
                 "pending", documentRepository.countByOwnerIdAndStatus(uid, DocumentStatus.PENDING_SIGNATURE),
                 "signed", documentRepository.countByOwnerIdAndStatus(uid, DocumentStatus.SIGNED),
                 "draft", documentRepository.countByOwnerIdAndStatus(uid, DocumentStatus.DRAFT)

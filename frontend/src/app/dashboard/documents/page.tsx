@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { authFetch } from '@/lib/auth';
-import SignModal from '@/components/dashboard/SignModal';
+import dynamic from 'next/dynamic';
+import { useLanguage } from '@/lib/i18n';
+const SignModal = dynamic(() => import('@/components/dashboard/SignModal'), { ssr: false });
+
 
 interface Document {
   id: string;
@@ -15,13 +18,13 @@ interface Document {
 }
 
 const STATUS_CONFIG = {
-  DRAFT: { label: 'Draft', color: '#64748b', bg: 'rgba(100,116,139,0.15)' },
-  PENDING_SIGNATURE: { label: 'Pending', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
-  SIGNED: { label: 'Signed', color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
-  REJECTED: { label: 'Rejected', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+  DRAFT: { key: 'status.draft', color: '#64748b', bg: 'rgba(100,116,139,0.15)' },
+  PENDING_SIGNATURE: { key: 'status.pending', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+  SIGNED: { key: 'status.signed', color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+  REJECTED: { key: 'status.rejected', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
 };
 
-const ALL_STATUSES = ['ALL', 'DRAFT', 'PENDING_SIGNATURE', 'SIGNED', 'REJECTED'] as const;
+const ALL_STATUSES = ['ALL', 'DRAFT', 'PENDING_SIGNATURE', 'SIGNED'] as const;
 
 export default function DocumentsPage() {
   const [docs, setDocs] = useState<Document[]>([]);
@@ -31,6 +34,7 @@ export default function DocumentsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [signModalDoc, setSignModalDoc] = useState<Document | null>(null);
+  const { t } = useLanguage();
 
   async function loadDocs() {
     try {
@@ -68,6 +72,9 @@ export default function DocumentsPage() {
   }
 
   const filtered = docs.filter((d) => {
+    // Front-end safety filter (though backend should handle this now)
+    if (d.status === 'REJECTED') return false; 
+    
     const matchSearch = d.title.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === 'ALL' || d.status === filterStatus;
     return matchSearch && matchStatus;
@@ -76,18 +83,18 @@ export default function DocumentsPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="animate-reveal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', marginBottom: '0.25rem' }}>Documents</h1>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '700', marginBottom: '0.25rem' }}>{t('docs.title')}</h1>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', margin: 0 }}>
-            {docs.length} document{docs.length !== 1 ? 's' : ''} total
+            {t('docs.total', { count: docs.length })}
           </p>
         </div>
         <Link href="/dashboard/upload" className="btn-primary" style={{ textDecoration: 'none', padding: '0.7rem 1.4rem', borderRadius: '10px', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
-          Upload PDF
+          {t('docs.upload_pdf')}
         </Link>
       </div>
 
@@ -98,10 +105,10 @@ export default function DocumentsPage() {
       )}
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="animate-reveal stagger-1" style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           type="text"
-          placeholder="Search documents..."
+          placeholder={t('docs.search')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
@@ -125,34 +132,34 @@ export default function DocumentsPage() {
                 color: filterStatus === s ? 'var(--color-accent)' : 'var(--color-text-muted)',
               }}
             >
-              {s === 'ALL' ? 'All' : STATUS_CONFIG[s as keyof typeof STATUS_CONFIG]?.label ?? s}
+              {s === 'ALL' ? t('status.all') : t(STATUS_CONFIG[s as keyof typeof STATUS_CONFIG]?.key ?? s)}
             </button>
           ))}
         </div>
       </div>
 
       {/* Table / List */}
-      <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
+      <div className="glass-panel animate-reveal stagger-2" style={{ padding: '0', overflow: 'hidden' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--color-text-muted)' }}>
             <div style={{ width: '32px', height: '32px', border: '3px solid var(--color-border)', borderTopColor: 'var(--color-accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 1rem' }} />
-            Loading documents...
+            {t('docs.loading')}
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '4rem 2rem', color: 'var(--color-text-muted)' }}>
             <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1} style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.3 }}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            {docs.length === 0 ? 'No documents yet. Upload your first PDF!' : 'No documents match your search.'}
+            {docs.length === 0 ? t('docs.no_docs') : t('docs.no_match')}
           </div>
         ) : (
           <>
             {/* Table header */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px 160px 100px', gap: '1rem', padding: '0.875rem 1.5rem', borderBottom: '1px solid var(--color-border)', fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <span>Title</span>
-              <span>Status</span>
-              <span>Uploaded</span>
-              <span style={{ textAlign: 'right' }}>Actions</span>
+              <span>{t('table.title')}</span>
+              <span>{t('table.status')}</span>
+              <span>{t('table.uploaded')}</span>
+              <span style={{ textAlign: 'right' }}>{t('table.actions')}</span>
             </div>
             {filtered.map((doc, i) => {
               const cfg = STATUS_CONFIG[doc.status] ?? STATUS_CONFIG.DRAFT;
@@ -179,7 +186,7 @@ export default function DocumentsPage() {
                     </span>
                   </div>
                   <span style={{ padding: '0.25rem 0.7rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: '600', color: cfg.color, background: cfg.bg, width: 'fit-content' }}>
-                    {cfg.label}
+                    {t(cfg.key)}
                   </span>
                   <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                     {new Date(doc.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}

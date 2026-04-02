@@ -10,61 +10,40 @@ function OAuth2RedirectHandler() {
     const searchParams = useSearchParams();
 
     useEffect(() => {
-        const token = searchParams.get('token');
         const error = searchParams.get('error');
 
-        if (token) {
-            // Fetch user profile based on token. Since JWT logic uses standard JWT we can fetch current user info
-            const fetchUserProfile = async () => {
-                try {
-                    // Usually we have an endpoint like /api/v1/auth/me, but if we don't, 
-                    // we could decode the JWT token payload locally to get basic info.
-                    // For the sake of standard integration:
-                    const res = await fetch(`${API_URL}/users/me`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    });
-                    
-                    if (res.ok) {
-                       const data = await res.json();
-                       saveAuth(token, {
-                           id: data.id,
-                           email: data.email,
-                           firstName: data.firstName,
-                           lastName: data.lastName,
-                           roles: data.roles
-                       });
-                       router.push('/dashboard');
-                    } else {
-                       // Fallback basic parse
-                       const base64Url = token.split('.')[1];
-                       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                       const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                           return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                       }).join(''));
-                       const decoded = JSON.parse(jsonPayload);
-                       
-                       saveAuth(token, {
-                           id: decoded.jti || 'oauth-id',
-                           email: decoded.sub,
-                           firstName: 'OAuth',
-                           lastName: 'User',
-                           roles: []
-                       });
-                       router.push('/dashboard');
-                    }
-                } catch (e) {
-                    console.error('Error fetching user profile', e);
-                    router.push('/login?error=OAuthFailed');
+        const fetchUserProfile = async () => {
+            try {
+                // The cookies are now automatically sent with this request
+                const res = await fetch(`${API_URL}/users/me`, {
+                    credentials: 'include'
+                });
+                
+                if (res.ok) {
+                   const data = await res.json();
+                   // saveAuth now only saves the user object to localStorage,
+                   // the token is already in the HttpOnly cookie.
+                   saveAuth('', {
+                       id: data.id,
+                       email: data.email,
+                       firstName: data.firstName,
+                       lastName: data.lastName,
+                       roles: data.roles
+                   });
+                   router.push('/dashboard');
+                } else {
+                   router.push('/login?error=SessionExpired');
                 }
-            };
+            } catch (e) {
+                console.error('Error fetching user profile', e);
+                router.push('/login?error=OAuthFailed');
+            }
+        };
 
-            fetchUserProfile();
-        } else if (error) {
+        if (error) {
             router.push('/login?error=' + error);
         } else {
-            router.push('/login');
+            fetchUserProfile();
         }
     }, [router, searchParams]);
 

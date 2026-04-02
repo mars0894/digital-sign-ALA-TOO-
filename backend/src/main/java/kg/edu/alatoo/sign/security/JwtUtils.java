@@ -12,11 +12,11 @@ import java.util.Date;
 @Component
 public class JwtUtils {
 
-    @Value("${jwt.secret:5c345b6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
-    @Value("${jwt.expirationSec:86400}")
-    private int jwtExpirationSec;
+    @Value("${jwt.expiration:86400000}")
+    private int jwtExpiration;
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
@@ -26,7 +26,7 @@ public class JwtUtils {
         return Jwts.builder()
                 .setSubject((userPrincipal.getUsername()))
                 .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + jwtExpirationSec * 1000L))
+                .setExpiration(new Date((new Date()).getTime() + jwtExpiration))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }

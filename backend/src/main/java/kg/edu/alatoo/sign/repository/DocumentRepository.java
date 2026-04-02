@@ -14,9 +14,15 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     List<Document> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
 
+    List<Document> findByOwnerIdAndStatusNotOrderByCreatedAtDesc(UUID ownerId, DocumentStatus status);
+
     Optional<Document> findByIdAndOwnerId(UUID id, UUID ownerId);
 
     long countByOwnerIdAndStatus(UUID ownerId, DocumentStatus status);
 
+    long countByOwnerIdAndStatusNot(UUID ownerId, DocumentStatus status);
+
     long countByOwnerId(UUID ownerId);
+
+    boolean existsByOriginalFileKeyAndOwnerId(String originalFileKey, UUID ownerId);
 }

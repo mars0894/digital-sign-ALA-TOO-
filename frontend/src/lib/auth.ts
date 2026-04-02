@@ -8,11 +8,16 @@ export interface AuthUser {
   roles: string[];
 }
 
-// ── Token helpers (localStorage + cookie sync) ────────────────────────────
+// ── Auth helpers (HttpOnly cookie based) ────────────────────────────
 
+/**
+ * Gets the token from cookies (if accessible, though it should be HttpOnly)
+ * or checks for existence of auth_token cookie.
+ */
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('auth_token');
+  const match = document.cookie.match(/(^| )auth_token=([^;]+)/);
+  return match ? match[2] : null;
 }
 
 export function getUser(): AuthUser | null {
@@ -26,20 +31,24 @@ export function getUser(): AuthUser | null {
 }
 
 export function isAuthenticated(): boolean {
-  return !!getToken();
+  // We check for the cookie name in document.cookie. 
+  // Note: If the cookie is HttpOnly, it won't appear in document.cookie.
+  // In that case, we might need a separate 'is_logged_in' session cookie (non-HttpOnly)
+  // or rely on the backend returning 401.
+  return !!getToken() || !!localStorage.getItem('auth_user');
 }
 
 export function saveAuth(token: string, user: AuthUser): void {
-  localStorage.setItem('auth_token', token);
+  // We no longer manually set the token in localStorage.
+  // The backend sets the HttpOnly cookie.
   localStorage.setItem('auth_user', JSON.stringify(user));
-  // Sync to cookie for middleware (no httpOnly so JS can write it)
-  document.cookie = `auth_token=${token}; path=/; max-age=${60 * 60 * 24}; SameSite=Strict`;
 }
 
 export function logout(): void {
   localStorage.removeItem('auth_token');
   localStorage.removeItem('auth_user');
-  document.cookie = 'auth_token=; path=/; max-age=0';
+  // Clear cookie by setting expiry to past
+  document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Strict';
   window.location.href = '/login';
 }
 
@@ -49,7 +58,6 @@ export async function authFetch(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const token = getToken();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
@@ -58,11 +66,12 @@ export async function authFetch(
     headers['Content-Type'] = 'application/json';
   }
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+  // Use credentials: 'include' to send HttpOnly cookies automatically
+  const res = await fetch(`${API_BASE}${endpoint}`, { 
+    ...options, 
+    headers,
+    credentials: 'include' 
+  });
 
   if (res.status === 401) {
     logout();

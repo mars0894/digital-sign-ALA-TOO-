@@ -37,9 +37,9 @@ public class SignatureService {
     @Transactional
     @SuppressWarnings("null")
     public List<Signature> signDocument(UUID documentId, List<SignRequest.SignatureElement> elements, User user) {
-        java.util.Optional<Document> optDoc = documentRepository.findById(documentId);
+        java.util.Optional<Document> optDoc = documentRepository.findByIdAndOwnerId(documentId, user.getId());
         Document document = optDoc
-                .orElseThrow(() -> new RuntimeException("Document not found"));
+                .orElseThrow(() -> new RuntimeException("Document not found or access denied"));
 
         if (document.getStatus() == DocumentStatus.SIGNED) {
             throw new IllegalStateException("Document is already signed");

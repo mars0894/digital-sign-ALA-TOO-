@@ -2,16 +2,18 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { authFetch, getToken } from '@/lib/auth';
+import { useLanguage } from '@/lib/i18n';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import SignatureCanvas from 'react-signature-canvas';
 
 // Set up worker
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString();
+if (typeof window !== 'undefined' && pdfjs) {
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs`;
+}
+
+
 
 interface SignModalProps {
   isOpen: boolean;
@@ -38,9 +40,10 @@ interface PlacedElement {
 export default function SignModal({ isOpen, onClose, documentId, documentTitle, onSuccess }: SignModalProps) {
   const [signing, setSigning] = useState(false);
   const [error, setError] = useState('');
+  const { t } = useLanguage();
   
   // Document State
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfFile, setPdfFile] = useState<Blob | string | null>(null);
   const [numPages, setNumPages] = useState<number>(1);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,7 +69,6 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
 
   // Extract State
   const [extractFile, setExtractFile] = useState<File | null>(null);
-  const [extractPdfUrl, setExtractPdfUrl] = useState<string | null>(null);
   const [extractPageNumber, setExtractPageNumber] = useState(1);
   const [extractNumPages, setExtractNumPages] = useState(1);
   const [extractBox, setExtractBox] = useState<{x: number, y: number, width: number, height: number} | null>(null);
@@ -74,6 +76,31 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
   const [extractDrag, setExtractDrag] = useState<any>(null);
 
   const sigCanvas = useRef<SignatureCanvas>(null);
+  const sigContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-resize the drawing canvas to match its container to avoid mouse offsets
+  useEffect(() => {
+    if (activeTab !== 'draw' || !sigCanvas.current || !sigContainerRef.current) return;
+    
+    const canvas = sigCanvas.current.getCanvas();
+    const container = sigContainerRef.current;
+    
+    const resizeCanvas = () => {
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      canvas.width = container.offsetWidth * ratio;
+      canvas.height = container.offsetHeight * ratio;
+      canvas.getContext('2d')?.scale(ratio, ratio);
+      sigCanvas.current?.clear(); // Clear on resize to avoid glitchy strokes
+    };
+
+    const observer = new ResizeObserver(() => resizeCanvas());
+    observer.observe(container);
+    
+    // Initial resize
+    resizeCanvas();
+    
+    return () => observer.disconnect();
+  }, [activeTab, isOpen]);
 
   async function handleDeleteVaultSig(id: string, e: React.MouseEvent) {
     e.stopPropagation();
@@ -119,17 +146,21 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
 
   useEffect(() => {
     const fetchDoc = async () => {
-      const currentToken = getToken();
-      if (isOpen && documentId && currentToken) {
+      if (isOpen && documentId) {
         try {
           const res = await authFetch(`/documents/${documentId}`);
+          if (!res.ok) return;
           const data = await res.json();
           if (data.downloadUrl) {
-            const pdfRes = await fetch(data.downloadUrl, { headers: { Authorization: `Bearer ${currentToken}` } });
-            if (pdfRes.ok) {
-              const blob = await pdfRes.blob();
-              setPdfUrl(URL.createObjectURL(blob));
-            } else throw new Error('Binary fetch fail');
+            // Extract the endpoint (e.g., /documents/download/...) from the full URL
+            const endpoint = data.downloadUrl.split('/api/v1')[1];
+            if (endpoint) {
+              const pdfRes = await authFetch(endpoint);
+              if (pdfRes.ok) {
+                const blob = await pdfRes.blob();
+                setPdfFile(blob);
+              }
+            }
           }
         } catch {
           setError('Failed to load document preview');
@@ -141,8 +172,6 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
       }
     };
     fetchDoc();
-
-    return () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); };
   }, [isOpen, documentId]);
 
   if (!isOpen) return null;
@@ -339,7 +368,6 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setExtractFile(file);
-      setExtractPdfUrl(URL.createObjectURL(file));
       setExtractPageNumber(1);
       setExtractBox(null);
     }
@@ -450,7 +478,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0 }}>Sign Target Document</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0 }}>{t('sign.title')}</h2>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', margin: 0 }}>{documentTitle}</p>
           </div>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
@@ -466,13 +494,13 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
               <div style={{ display: 'flex', alignItems: 'center', marginRight: 'auto', marginLeft: '1rem', gap: '1rem' }}>
                 <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>Target Document</span>
               </div>
-              <button disabled={pageNumber <= 1} onClick={() => setPageNumber(v => v - 1)} style={{ padding: '0.2rem 0.5rem', cursor: 'pointer', background: 'var(--glass-bg)', color: 'var(--color-text-main)', border: '1px solid var(--color-border)', borderRadius: '4px' }}>Prev</button>
-              <span style={{ color: 'var(--color-text-main)', fontSize: '0.9rem', display: 'flex', alignItems: 'center' }}>Page {pageNumber} of {numPages}</span>
-              <button disabled={pageNumber >= numPages} onClick={() => setPageNumber(v => v + 1)} style={{ padding: '0.2rem 0.5rem', cursor: 'pointer', background: 'var(--glass-bg)', color: 'var(--color-text-main)', border: '1px solid var(--color-border)', borderRadius: '4px' }}>Next</button>
+              <button disabled={pageNumber <= 1} onClick={() => setPageNumber(v => v - 1)} style={{ padding: '0.2rem 0.5rem', cursor: 'pointer', background: 'var(--glass-bg)', color: 'var(--color-text-main)', border: '1px solid var(--color-border)', borderRadius: '4px' }}>{t('sign.prev')}</button>
+              <span style={{ color: 'var(--color-text-main)', fontSize: '0.9rem', display: 'flex', alignItems: 'center' }}>{t('sign.page', { current: pageNumber, total: numPages })}</span>
+              <button disabled={pageNumber >= numPages} onClick={() => setPageNumber(v => v + 1)} style={{ padding: '0.2rem 0.5rem', cursor: 'pointer', background: 'var(--glass-bg)', color: 'var(--color-text-main)', border: '1px solid var(--color-border)', borderRadius: '4px' }}>{t('sign.next')}</button>
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: '1rem', display: 'flex', justifyContent: 'center', position: 'relative' }} onMouseMove={docHandlers.onMouseMove} onMouseUp={docHandlers.onMouseUp} onMouseLeave={docHandlers.onMouseUp}>
-              {pdfUrl && (
-                <Document file={pdfUrl} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
+              {pdfFile && (
+                <Document file={pdfFile} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
                   <div ref={containerRef} onMouseDown={docHandlers.onContainerMouseDown} style={{ position: 'relative', cursor: 'crosshair', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
                     <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} />
                     
@@ -521,7 +549,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                   onMouseEnter={e => { if (activeTab !== tab) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
                   onMouseLeave={e => { if (activeTab !== tab) e.currentTarget.style.background = 'rgba(20, 25, 35, 1)' }}
                 >
-                  {tab === 'vault' ? 'Vault' : tab === 'extract' ? 'PDF Extractor' : tab === 'tools' ? 'Quick Tools' : tab}
+                  {t(`tab.${tab}`)}
                 </button>
               ))}
             </div>
@@ -533,10 +561,20 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
               {activeTab === 'draw' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
                   <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', margin: 0 }}>Use your mouse or touchscreen to draw a fresh signature.</p>
-                  <div style={{ background: 'white', borderRadius: '12px', border: '2px solid var(--color-border)', overflow: 'hidden', height: '200px' }}>
-                    <SignatureCanvas ref={sigCanvas} penColor="black" canvasProps={{ width: 1000, height: 200, className: 'sigCanvas', style: { width: '100%', height: '100%' } }} />
+                  <div 
+                    ref={sigContainerRef}
+                    style={{ background: 'white', borderRadius: '12px', border: '2px solid var(--color-border)', overflow: 'hidden', height: '200px', width: '100%', display: 'flex', justifyContent: 'center' }}
+                  >
+                    <SignatureCanvas 
+                      ref={sigCanvas} 
+                      penColor="black" 
+                      canvasProps={{ 
+                        className: 'sigCanvas', 
+                        style: { cursor: 'crosshair', touchAction: 'none', width: '100%', height: '100%' } 
+                      }} 
+                    />
                   </div>
-                  <button onClick={() => { sigCanvas.current?.clear(); }} style={{ alignSelf: 'flex-start', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem' }}>Clear Canvas</button>
+                  <button onClick={() => { sigCanvas.current?.clear(); }} style={{ alignSelf: 'flex-start', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem' }}>{t('sign.clear')}</button>
                   
                   <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.05)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-text-main)', cursor: 'pointer' }}>
@@ -603,7 +641,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
                   <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', margin: 0 }}>Upload an old document, crop out your signature, and extract it cleanly!</p>
                   
-                  {!extractPdfUrl ? (
+                  {!extractFile ? (
                     <label style={{ border: '2px dashed var(--color-border)', borderRadius: '12px', padding: '3rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
                       <input type="file" accept="application/pdf" onChange={handleExtractFileUpload} style={{ display: 'none' }} />
                       <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
@@ -617,7 +655,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                         <button disabled={extractPageNumber >= extractNumPages} onClick={() => setExtractPageNumber(v => v + 1)} style={{ padding: '0.2rem 0.5rem' }}>Next &rarr;</button>
                       </div>
                       <div style={{ flex: 1, overflow: 'auto', background: 'rgba(0,0,0,0.5)', borderRadius: '8px', padding: '1rem', display: 'flex', justifyContent: 'center' }} onMouseMove={extrHandlers.onMouseMove} onMouseUp={extrHandlers.onMouseUp} onMouseLeave={extrHandlers.onMouseUp}>
-                        <Document file={extractPdfUrl} onLoadSuccess={({ numPages }) => setExtractNumPages(numPages)}>
+                        <Document file={extractFile} onLoadSuccess={({ numPages }) => setExtractNumPages(numPages)}>
                           <div ref={extractContainerRef} onMouseDown={extrHandlers.onContainerMouseDown} style={{ position: 'relative', cursor: 'crosshair', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
                             <Page pageNumber={extractPageNumber} renderTextLayer={false} renderAnnotationLayer={false} width={400} />
                             {extractBox && (
@@ -636,7 +674,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                         </Document>
                       </div>
                       <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                        <button onClick={() => { setExtractPdfUrl(null); setExtractBox(null); }} style={{ flex: 1, padding: '0.8rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-main)', cursor: 'pointer', fontWeight: 600 }}>Cancel Source</button>
+                        <button onClick={() => { setExtractFile(null); setExtractBox(null); }} style={{ flex: 1, padding: '0.8rem', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-main)', cursor: 'pointer', fontWeight: 600 }}>Cancel Source</button>
                         <button onClick={handleExtractCrop} disabled={!extractBox} style={{ flex: 2, padding: '0.8rem', background: '#3b82f6', border: 'none', borderRadius: '8px', color: 'white', cursor: extractBox ? 'pointer' : 'not-allowed', fontWeight: 600 }}>Crop & Insert directly to Page</button>
                       </div>
                     </div>
@@ -747,10 +785,10 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
             {/* Action Footer */}
             <div style={{ padding: '1.5rem', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <button disabled={signing || placedElements.length === 0} onClick={handleSign} style={{ width: '100%', padding: '1rem', borderRadius: '10px', background: (placedElements.length === 0 || signing) ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #10b981, #059669)', border: (placedElements.length === 0 || signing) ? '1px solid var(--color-border)' : 'none', color: (placedElements.length === 0 || signing) ? 'var(--color-text-muted)' : 'white', cursor: (placedElements.length === 0 || signing) ? 'not-allowed' : 'pointer', fontWeight: 600, boxShadow: (placedElements.length === 0 || signing) ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.25)', transition: 'all 0.2s', fontSize: '1rem' }}>
-                {signing ? 'Working...' : `Stamp ${placedElements.length} Elements`}
+                {signing ? t('sign.working') : t('sign.stamp', { count: placedElements.length })}
               </button>
               <button disabled={signing} onClick={onClose} style={{ width: '100%', padding: '0.8rem', borderRadius: '10px', background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontWeight: 600, transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = 'white'} onMouseLeave={e => e.currentTarget.style.color = 'var(--color-text-muted)'}>
-                Discard Changes
+                {t('sign.discard')}
               </button>
             </div>
           </div>

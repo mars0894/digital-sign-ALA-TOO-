@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getUser, authFetch } from '@/lib/auth';
 
+import { useLanguage } from '@/lib/i18n';
+
 interface Stats {
   total: number;
   pending: number;
@@ -52,6 +54,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
 
   useEffect(() => {
     async function load() {
@@ -71,7 +74,7 @@ export default function DashboardPage() {
     load();
   }, []);
 
-  const recentDocs = docs.slice(0, 5);
+  const recentDocs = docs.filter(d => d.status !== 'REJECTED').slice(0, 5);
 
   return (
     <div>
@@ -88,7 +91,7 @@ export default function DashboardPage() {
       {/* Stats grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
         <StatCard
-          label="Total Documents"
+          label={t('docs.total_count')}
           value={loading ? '—' : (stats?.total ?? 0)}
           gradient="linear-gradient(135deg, #3b82f6, #2563eb)"
           icon={<svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}

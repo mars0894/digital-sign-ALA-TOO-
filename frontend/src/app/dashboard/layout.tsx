@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getUser, logout, AuthUser } from '@/lib/auth';
+import { useLanguage, LanguageSwitcher } from '@/lib/i18n';
 
 const navItems = [
   {
     href: '/dashboard',
-    label: 'Dashboard',
+    labelKey: 'nav.dashboard',
     icon: (
       <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -17,7 +18,7 @@ const navItems = [
   },
   {
     href: '/dashboard/documents',
-    label: 'Documents',
+    labelKey: 'nav.documents',
     icon: (
       <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -26,7 +27,7 @@ const navItems = [
   },
   {
     href: '/dashboard/upload',
-    label: 'Upload',
+    labelKey: 'nav.upload',
     icon: (
       <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -40,6 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const u = getUser();
@@ -93,7 +95,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Ala-Too Sign
           </span>
           <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.1rem', marginBottom: 0 }}>
-            Digital Signature Platform
+            {t('app.subtitle')}
           </p>
         </div>
 
@@ -126,7 +128,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
               >
                 {item.icon}
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             );
           })}
@@ -171,8 +173,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            Sign Out
+            {t('nav.sign_out')}
           </button>
+          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center' }}>
+            <LanguageSwitcher />
+          </div>
         </div>
       </aside>
 

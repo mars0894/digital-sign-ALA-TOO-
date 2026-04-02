@@ -40,7 +40,12 @@ public class StorageService {
 
     public byte[] getFile(String key) {
         try {
-            return Files.readAllBytes(Paths.get(storageDir, key));
+            Path storagePath = Paths.get(storageDir).toAbsolutePath();
+            Path resolved = storagePath.resolve(key).normalize();
+            if (!resolved.startsWith(storagePath)) {
+                throw new SecurityException("Illegal file path");
+            }
+            return Files.readAllBytes(resolved);
         } catch (IOException e) {
             throw new RuntimeException("File not found");
         }

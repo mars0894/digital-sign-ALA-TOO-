@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-import org.springframework.web.util.UriComponentsBuilder;
+
 import java.util.UUID;
 
 @Component
@@ -63,13 +63,18 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             return userRepository.save(newUser);
         });
 
-        // We could generate JWT token and redirect to frontend
+        // Generate JWT token for the OAuth2 user
         String token = jwtUtils.generateJwtToken(user);
-        
-        String targetUrl = UriComponentsBuilder.fromUriString("http://localhost:3000/oauth2/redirect")
-                .queryParam("token", token)
-                .build().toUriString();
 
-        getRedirectStrategy().sendRedirect(request, response, targetUrl);
+        // Set JWT as HttpOnly cookie (not accessible via JavaScript)
+        jakarta.servlet.http.Cookie cookie = new jakarta.servlet.http.Cookie("auth_token", token);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(24 * 60 * 60); // 24 hours
+        cookie.setAttribute("SameSite", "Strict");
+        response.addCookie(cookie);
+
+        // Redirect to dashboard without token in URL
+        getRedirectStrategy().sendRedirect(request, response, "http://localhost:3000/dashboard");
     }
 }

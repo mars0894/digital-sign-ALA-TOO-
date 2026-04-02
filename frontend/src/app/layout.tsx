@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: 'Secure digital signatures platform for Ala-Too International University',
 };
 
+import { LanguageProvider } from '@/lib/i18n';
+
 export default function RootLayout({
   children,
 }: {
@@ -14,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
+        <LanguageProvider>
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

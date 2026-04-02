@@ -21,10 +21,15 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/documents")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*", maxAge = 3600)
 public class DocumentController {
 
     private final DocumentService documentService;
+
+    private static final List<String> ALLOWED_CONTENT_TYPES = List.of(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
 
     /**
      * POST /api/v1/documents
@@ -38,6 +43,10 @@ public class DocumentController {
 
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().build();
+        }
+
+        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNSUPPORTED_MEDIA_TYPE).build();
         }
 
         DocumentResponse response = documentService.uploadDocument(file, title, currentUser);
@@ -55,6 +64,10 @@ public class DocumentController {
 
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().build();
+        }
+
+        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.UNSUPPORTED_MEDIA_TYPE).build();
         }
 
         byte[] pdfData = documentService.convertToPdfOnly(file);
@@ -120,9 +133,11 @@ public class DocumentController {
      * GET /api/v1/documents/download/**
      */
     @GetMapping("/download/**")
-    public ResponseEntity<byte[]> downloadDocument(jakarta.servlet.http.HttpServletRequest request) {
+    public ResponseEntity<byte[]> downloadDocument(
+            jakarta.servlet.http.HttpServletRequest request,
+            @AuthenticationPrincipal User currentUser) {
         String path = request.getRequestURI().split(request.getContextPath() + "/api/v1/documents/download/")[1];
-        byte[] file = documentService.getFileData(path);
+        byte[] file = documentService.getFileData(path, currentUser);
         
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);

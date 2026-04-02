@@ -24,6 +24,7 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       });
 
@@ -33,7 +34,8 @@ export default function LoginPage() {
         throw new Error(data.message || 'Login failed');
       }
 
-      saveAuth(data.token, {
+      // saveAuth now doesn't need to manually save the token (it's in the HttpOnly cookie)
+      saveAuth('', {
         id: data.id,
         email: data.email,
         firstName: data.firstName,
