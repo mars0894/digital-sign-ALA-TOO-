@@ -35,6 +35,7 @@ public class DocumentService {
      * Upload a PDF and persist the Document record.
      */
     @Transactional
+    @SuppressWarnings("null")
     public DocumentResponse uploadDocument(MultipartFile file, String title, User owner) throws IOException {
         byte[] pdfData;
         try {
@@ -62,7 +63,6 @@ public class DocumentService {
                 .status(DocumentStatus.PENDING_SIGNATURE)
                 .build();
 
-        @SuppressWarnings("null")
         document = documentRepository.save(document);
 
         audit(document, "UPLOAD", owner,
@@ -153,15 +153,16 @@ public class DocumentService {
         return "documents/" + userId + "/" + UUID.randomUUID() + "_" + sanitized;
     }
 
+    @SuppressWarnings("null")
     private void audit(Document document, String action, User actor, String details) {
-        AuditLog log = AuditLog.builder()
+        AuditLog auditLog = AuditLog.builder()
                 .entityName("Document")
                 .entityId(document.getId())
                 .action(action)
                 .performedBy(actor)
                 .details(details)
                 .build();
-        auditLogRepository.save(log);
+        auditLogRepository.save(auditLog);
     }
 
     private DocumentResponse toResponse(Document doc, String presignedUrl) {

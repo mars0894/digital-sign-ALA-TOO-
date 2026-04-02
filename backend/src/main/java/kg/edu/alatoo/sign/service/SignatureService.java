@@ -35,8 +35,8 @@ public class SignatureService {
     private final StorageService storageService;
 
     @Transactional
+    @SuppressWarnings("null")
     public List<Signature> signDocument(UUID documentId, List<SignRequest.SignatureElement> elements, User user) {
-        @SuppressWarnings("null")
         java.util.Optional<Document> optDoc = documentRepository.findById(documentId);
         Document document = optDoc
                 .orElseThrow(() -> new RuntimeException("Document not found"));
@@ -129,7 +129,6 @@ public class SignatureService {
                                 .timestamp(LocalDateTime.now())
                                 .build();
 
-                        @SuppressWarnings("null")
                         Signature savedSignature = signatureRepository.save(signature);
                         savedSignatures.add(savedSignature);
                     }
