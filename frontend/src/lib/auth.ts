@@ -44,10 +44,14 @@ export function saveAuth(token: string, user: AuthUser): void {
   // Token is now set on the backend via HttpOnly Cookie. 
   // We only persist the non-sensitive metadata for UI usage.
   localStorage.setItem('auth_user', JSON.stringify(user));
+  // Set a non-HttpOnly cookie so Next.js middleware can detect auth state
+  document.cookie = `auth_user=${encodeURIComponent(JSON.stringify(user))}; path=/; max-age=${24 * 60 * 60}; SameSite=Strict`;
 }
 
 export async function logout(): Promise<void> {
   localStorage.removeItem('auth_user');
+  // Clear the auth indicator cookie
+  document.cookie = 'auth_user=; path=/; max-age=0; SameSite=Strict';
   
   try {
     await fetch(`${API_BASE}/auth/logout`, {

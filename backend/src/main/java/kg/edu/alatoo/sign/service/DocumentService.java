@@ -106,6 +106,9 @@ public class DocumentService {
      */
     @Transactional(readOnly = true)
     public DocumentResponse getDocument(UUID documentId, User owner) {
+        if (owner == null) {
+            throw new RuntimeException("Access denied: User not authenticated.");
+        }
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document not found."));
 
@@ -123,6 +126,9 @@ public class DocumentService {
      */
     @Transactional(readOnly = true)
     public String getAuthorizedFileKey(UUID documentId, User user) {
+        if (user == null) {
+            throw new RuntimeException("Access denied: User not authenticated.");
+        }
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new RuntimeException("Document not found."));
 

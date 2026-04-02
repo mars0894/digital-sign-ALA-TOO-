@@ -14,8 +14,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import jakarta.servlet.http.Cookie;
-import java.util.Arrays;
 
 @Component
 @RequiredArgsConstructor
@@ -25,7 +23,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+    protected void doFilterInternal(@org.springframework.lang.NonNull HttpServletRequest request, @org.springframework.lang.NonNull HttpServletResponse response, @org.springframework.lang.NonNull FilterChain filterChain)
             throws ServletException, IOException {
         try {
             String jwt = parseJwt(request);
@@ -50,16 +48,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String headerAuth = request.getHeader("Authorization");
 
         if (StringUtils.hasText(headerAuth) && headerAuth.startsWith("Bearer ")) {
-            return headerAuth.substring(7);
+            String token = headerAuth.substring(7);
+            if (token.chars().filter(ch -> ch == '.').count() == 2) {
+                return token;
+            }
         }
 
         if (request.getCookies() != null) {
-            Cookie jwtCookie = Arrays.stream(request.getCookies())
+            jakarta.servlet.http.Cookie jwtCookie = java.util.Arrays.stream(request.getCookies())
                     .filter(c -> "jwt_token".equals(c.getName()))
                     .findFirst()
                     .orElse(null);
-            if (jwtCookie != null && StringUtils.hasText(jwtCookie.getValue())) {
-                return jwtCookie.getValue();
+            if (jwtCookie != null && org.springframework.util.StringUtils.hasText(jwtCookie.getValue())) {
+                String value = jwtCookie.getValue();
+                // Basic JWT structure check (2 periods) to ignore indicator cookies like "cookie-driven"
+                long dotCount = value.chars().filter(ch -> ch == '.').count();
+                if (dotCount == 2) {
+                    return value;
+                }
             }
         }
 

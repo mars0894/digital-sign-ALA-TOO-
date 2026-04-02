@@ -171,14 +171,20 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
             const downloadUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1') + `/documents/download?token=${downloadToken}`;
             const pdfRes = await fetch(downloadUrl);
             if (pdfRes.ok) {
+              const contentType = pdfRes.headers.get('content-type') || '';
               const blob = await pdfRes.blob();
-              setPdfUrl(URL.createObjectURL(blob));
-            } else throw new Error('Binary fetch fail');
+              const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+              setPdfUrl(URL.createObjectURL(pdfBlob));
+            } else {
+              const errText = await pdfRes.text().catch(() => '');
+              throw new Error(`Download failed (${pdfRes.status}): ${errText.substring(0, 100)}`);
+            }
           } else {
-            throw new Error('Failed to get download token');
+            const errData = await tokenRes.json().catch(() => ({}));
+            throw new Error(errData.message || `Failed to get download token (${tokenRes.status})`);
           }
-        } catch {
-          setError('Failed to load document preview');
+        } catch (err: any) {
+          setError(err.message || 'Failed to load document preview');
         }
 
         // Fetch Vault
@@ -607,7 +613,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: '1rem', display: 'flex', justifyContent: 'center', position: 'relative' }} onMouseMove={docHandlers.onMouseMove} onMouseUp={docHandlers.onMouseUp} onMouseLeave={docHandlers.onMouseUp}>
               {pdfUrl && (
-                <Document file={pdfUrl} onLoadSuccess={({ numPages }) => setNumPages(numPages)}>
+                <Document file={pdfUrl} onLoadSuccess={({ numPages }) => setNumPages(numPages)} onLoadError={(err) => setError(`Failed to load PDF file: ${err.message}`)}>
                   <div ref={containerRef} onMouseDown={docHandlers.onContainerMouseDown} style={{ position: 'relative', cursor: 'crosshair', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
                     <Page pageNumber={pageNumber} renderTextLayer={false} renderAnnotationLayer={false} />
                     
@@ -681,7 +687,7 @@ export default function SignModal({ isOpen, onClose, documentId, documentTitle, 
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as TabType)}
-                  style={{ padding: '0.8rem 0.5rem', background: activeTab === tab ? 'rgba(16, 185, 129, 0.1)' : 'rgba(20, 25, 35, 1)', border: 'none', color: activeTab === tab ? '#10b981' : 'var(--color-text-main)', cursor: 'pointer', fontWeight: 600, textTransform: 'capitalize', fontSize: '0.80rem', borderBottom: activeTab === tab ? '2px solid #10b981' : '2px solid transparent', transition: 'all 0.15s' }}
+                  style={{ padding: '0.8rem 0.5rem', background: activeTab === tab ? 'rgba(16, 185, 129, 0.1)' : 'rgba(20, 25, 35, 1)', border: 'none', color: activeTab === tab ? '#10b981' : '#e2e8f0', cursor: 'pointer', fontWeight: 600, textTransform: 'capitalize', fontSize: '0.80rem', borderBottom: activeTab === tab ? '2px solid #10b981' : '2px solid transparent', transition: 'all 0.15s' }}
                   onMouseEnter={e => { if (activeTab !== tab) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
                   onMouseLeave={e => { if (activeTab !== tab) e.currentTarget.style.background = 'rgba(20, 25, 35, 1)' }}
                 >

@@ -56,7 +56,7 @@ public class DocumentController {
             @PathVariable UUID id,
             @AuthenticationPrincipal User currentUser) {
 
-        DocumentResponse doc = documentService.getDocument(id, currentUser);
+        documentService.getDocument(id, currentUser); // Verification check remains
         // The getDocument call above already performs ownership/collaborator checks.
         // We'll need a way to get the original file key from the service if it's not in the response.
         // For now, assume we can get it or we refactor getDocument.

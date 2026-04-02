@@ -10,7 +10,8 @@ export function middleware(request: NextRequest) {
   if (!isProtected) return NextResponse.next();
 
   // Check for token in cookies (set by the auth helpers on login)
-  const token = request.cookies.get('auth_token')?.value;
+  // Check for the HttpOnly JWT cookie set by the backend, or the auth_user cookie set by the frontend
+  const token = request.cookies.get('jwt_token')?.value || request.cookies.get('auth_user')?.value;
 
   if (!token) {
     const loginUrl = new URL('/login', request.url);

@@ -39,13 +39,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final DocumentCollaboratorRepository documentCollaboratorRepository;
 
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
+    public void configureMessageBroker(@org.springframework.lang.NonNull MessageBrokerRegistry config) {
         config.enableSimpleBroker("/topic");
         config.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
+    public void registerStompEndpoints(@org.springframework.lang.NonNull StompEndpointRegistry registry) {
       // SockJS is used if the browser does not support or allow native WebSocket.
       registry.addEndpoint("/ws")
               .setAllowedOriginPatterns(allowedOrigins.toArray(new String[0]))
@@ -53,16 +53,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     }
 
     @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
+    public void configureClientInboundChannel(@org.springframework.lang.NonNull ChannelRegistration registration) {
         registration.interceptors(new ChannelInterceptor() {
             @Override
-            public Message<?> preSend(Message<?> message, MessageChannel channel) {
+            public Message<?> preSend(@org.springframework.lang.NonNull Message<?> message, @org.springframework.lang.NonNull MessageChannel channel) {
                 StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
                 
                 if (accessor != null && org.springframework.messaging.simp.stomp.StompCommand.CONNECT.equals(accessor.getCommand())) {
                     // Extract JWT. Usually in WebSocket context without cookies we expect it in native headers or passing it via native Stomp headers.
                     // For WebSockets, standard cookies might not flow consistently if cross-origin. Let's look for standard headers or Stomp native auth headers.
-                    String authToken = accessor.getFirstNativeHeader("Authorization");
+                    String authToken = accessor != null ? accessor.getFirstNativeHeader("Authorization") : null;
                     if (StringUtils.hasText(authToken) && authToken.startsWith("Bearer ")) {
                         String jwt = authToken.substring(7);
                         if (jwtUtils.validateJwtToken(jwt)) {
