@@ -62,6 +62,7 @@ public class DocumentService {
                 .status(DocumentStatus.PENDING_SIGNATURE)
                 .build();
 
+        @SuppressWarnings("null")
         document = documentRepository.save(document);
 
         audit(document, "UPLOAD", owner,

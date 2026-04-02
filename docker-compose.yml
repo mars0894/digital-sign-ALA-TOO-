@@ -47,7 +47,7 @@ services:
       dockerfile: Dockerfile
     container_name: alatoo-backend
     ports:
-      - "8080:8080"
+      - "8081:8081"
     environment:
       DB_HOST: alatoo-db
       REDIS_HOST: alatoo-cache

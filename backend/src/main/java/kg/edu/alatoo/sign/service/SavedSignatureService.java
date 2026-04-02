@@ -23,7 +23,9 @@ public class SavedSignatureService {
                 .label(request.getLabel())
                 .imageData(request.getImageData())
                 .build();
-        sig = repository.save(sig);
+        @SuppressWarnings("null")
+        SavedSignature savedSig = repository.save(sig);
+        sig = savedSig;
         return mapToResponse(sig);
     }
 
@@ -34,7 +36,9 @@ public class SavedSignatureService {
     }
 
     public void deleteSignature(User user, UUID id) {
-        SavedSignature sig = repository.findById(id)
+        @SuppressWarnings("null")
+        java.util.Optional<SavedSignature> optSig = repository.findById(id);
+        SavedSignature sig = optSig
                 .orElseThrow(() -> new RuntimeException("Saved signature not found"));
         if (!sig.getUser().getId().equals(user.getId())) {
             throw new RuntimeException("Unauthorized");

@@ -36,7 +36,9 @@ public class SignatureService {
 
     @Transactional
     public List<Signature> signDocument(UUID documentId, List<SignRequest.SignatureElement> elements, User user) {
-        Document document = documentRepository.findById(documentId)
+        @SuppressWarnings("null")
+        java.util.Optional<Document> optDoc = documentRepository.findById(documentId);
+        Document document = optDoc
                 .orElseThrow(() -> new RuntimeException("Document not found"));
 
         if (document.getStatus() == DocumentStatus.SIGNED) {
@@ -127,7 +129,9 @@ public class SignatureService {
                                 .timestamp(LocalDateTime.now())
                                 .build();
 
-                        savedSignatures.add(signatureRepository.save(signature));
+                        @SuppressWarnings("null")
+                        Signature savedSignature = signatureRepository.save(signature);
+                        savedSignatures.add(savedSignature);
                     }
                     
                     if (pdModified) {
