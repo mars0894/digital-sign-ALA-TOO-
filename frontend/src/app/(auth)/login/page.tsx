@@ -19,6 +19,7 @@ export default function LoginPage() {
     setError('');
 
     try {
+
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {

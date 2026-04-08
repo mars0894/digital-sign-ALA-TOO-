@@ -1,5 +1,5 @@
 CREATE TABLE saved_signatures (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     label VARCHAR(255) NOT NULL,
     image_data TEXT NOT NULL,

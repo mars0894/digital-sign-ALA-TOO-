@@ -24,6 +24,10 @@ export default function RegisterPage() {
     setSuccess('');
 
     try {
+<<<<<<< HEAD
+=======
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+>>>>>>> 6f0e840 (Update backend and frontend components, add .gitignore)
       const res = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: {
